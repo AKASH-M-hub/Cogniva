@@ -44,5 +44,8 @@ frontend/dist/
 
 # Local data/logs
 *.log
+*.db
+*_err.txt
+git_status_log.txt
 backend/chroma_db/
 backend/uploads/

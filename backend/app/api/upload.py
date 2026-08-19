@@ -81,14 +81,14 @@ async def upload_document(
             print(f"PostgreSQL Document Metadata Save Notice: {db_err}")
 
         # 2. Store Vector Embeddings in ChromaDB Persistent Client
-        file_ts = datetime.datetime.fromtimestamp(os.path.getmtime(file_path)).strftime("%Y-%m-%d %H:%M") if os.path.exists(file_path) else datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        now_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         stored_chunks = store_embeddings(
             filename=file.filename,
             chunks=chunks,
-            department="Engineering",
+            department="Engineering" if "spec" in file.filename.lower() or "contract" in file.filename.lower() else "General",
             document_id=doc_id,
             category="PDF/DOCX Document",
-            timestamp=file_ts
+            timestamp=now_ts
         )
 
         return {
@@ -142,7 +142,14 @@ async def add_knowledge_text(
         
         virtual_filename = f"{request.department}_{request.title.replace(' ', '_')}.txt"
         chunks = chunk_text(combined_text)
-        stored_chunks = store_embeddings(virtual_filename, chunks)
+        now_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        stored_chunks = store_embeddings(
+            filename=virtual_filename,
+            chunks=chunks,
+            department=request.department or "Engineering",
+            category=request.category or "Structured Knowledge",
+            timestamp=now_ts
+        )
 
         return {
             "success": True,
@@ -161,8 +168,6 @@ def get_upload_history(db: Session = Depends(get_db)):
     """Returns categorized history of all uploaded documents and indexed memories."""
     history = []
     uploads_dir = "uploads"
-
-    from app.services.vector_service import collection
 
     # 1. Scan physical uploads directory
     if os.path.exists(uploads_dir):
@@ -207,6 +212,7 @@ def get_upload_history(db: Session = Depends(get_db)):
 
     # 2. Query PostgreSQL Memory table for structured memories
     try:
+        from app.models.memory import Memory
         memories = db.query(Memory).order_by(Memory.id.desc()).all()
         for mem in memories:
             history.append({
@@ -260,6 +266,7 @@ def clear_all_data(db: Session = Depends(get_db)):
     # 2. Clear ChromaDB vector collection
     deleted_vectors_count = 0
     try:
+        from app.services.vector_service import collection
         data = collection.get()
         if data and "ids" in data and len(data["ids"]) > 0:
             deleted_vectors_count = len(data["ids"])
@@ -363,19 +370,9 @@ def get_chroma_history():
         
         total_vectors = collection.count()
         data = collection.get(
-            limit=150,
             include=["documents", "metadatas"]
         )
         
-        uploads_dir = "uploads"
-        file_timestamps = {}
-        if os.path.exists(uploads_dir):
-            for fname in os.listdir(uploads_dir):
-                fpath = os.path.join(uploads_dir, fname)
-                if os.path.isfile(fpath):
-                    st = os.stat(fpath)
-                    file_timestamps[fname] = datetime.datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M")
-
         items = []
         if data and "ids" in data and data["ids"]:
             for idx, item_id in enumerate(data["ids"]):
@@ -384,13 +381,8 @@ def get_chroma_history():
                 
                 fname = meta.get("filename", meta.get("source", "Unknown_Source"))
                 timestamp = meta.get("timestamp")
-                if not timestamp or timestamp.startswith("2026-08-12"):
-                    if fname in file_timestamps:
-                        timestamp = file_timestamps[fname]
-                    elif "timestamp" in meta:
-                        timestamp = meta["timestamp"]
-                    else:
-                        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                if not timestamp:
+                    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
                 items.append({
                     "id": item_id,
@@ -406,6 +398,8 @@ def get_chroma_history():
                     "embedding_model": "all-MiniLM-L6-v2",
                     "timestamp": timestamp
                 })
+
+        items.sort(key=lambda x: (x["timestamp"], x["filename"], x["chunk_index"]), reverse=True)
                 
         return {
             "success": True,
@@ -422,6 +416,7 @@ def get_chroma_history():
             "total_vectors": 0,
             "items": []
         }
+
 
 
 @router.get("/file/{filename}")

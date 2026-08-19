@@ -21,6 +21,16 @@ app = FastAPI(
     version="1.0.0"
 )
 
+from app.services.automation_service import start_automation_scheduler, shutdown_automation_scheduler
+
+@app.on_event("startup")
+def startup_event():
+    start_automation_scheduler()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    shutdown_automation_scheduler()
+
 # Enable CORS for frontend cross-origin requests
 app.add_middleware(
     CORSMiddleware,

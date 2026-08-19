@@ -314,7 +314,8 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
           {data && data.length > 0 ? (
             data.map((item, idx) => {
               const fileName = item.filename || item.name || 'Uploaded Document';
-              const chunkTitle = isVectorStore ? `${fileName}` : fileName;
+              const chunkIndexDisplay = item.chunk_index !== undefined ? item.chunk_index + 1 : idx + 1;
+              const chunkTitle = isVectorStore ? `${fileName} (Chunk #${chunkIndexDisplay})` : fileName;
               const chunkTypeDisplay = isVectorStore ? 'Document Chunk' : (item.type || item.category || 'PDF Document');
 
               return (
@@ -618,11 +619,11 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
           </div>
 
           {sortedRecordDates.length > 0 ? (
-            sortedRecordDates.map((dateStr) => {
+            sortedRecordDates.map((dateStr, idx) => {
               const timeSegments = groupedRecordsByDateAndTime[dateStr];
               const segmentKeys = Object.keys(timeSegments);
               const totalDocsInDate = segmentKeys.reduce((acc, seg) => acc + (timeSegments[seg]?.length || 0), 0);
-              const isExpanded = Boolean(expandedDates[dateStr]);
+              const isExpanded = expandedDates[dateStr] !== undefined ? Boolean(expandedDates[dateStr]) : (idx === 0);
 
               return (
                 <div key={dateStr} className="bg-white border border-slate-200 hover:border-indigo-200 rounded-2xl shadow-xs overflow-hidden transition-all">
@@ -993,11 +994,11 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
           </div>
 
           {sortedChromaDates.length > 0 ? (
-            sortedChromaDates.map((dateStr) => {
+            sortedChromaDates.map((dateStr, idx) => {
               const timeSegments = groupedChromaByDateAndTime[dateStr];
               const segmentKeys = Object.keys(timeSegments);
               const totalChunksInDate = segmentKeys.reduce((acc, seg) => acc + (timeSegments[seg]?.length || 0), 0);
-              const isExpanded = Boolean(expandedDates[`chroma_${dateStr}`]);
+              const isExpanded = expandedDates[`chroma_${dateStr}`] !== undefined ? Boolean(expandedDates[`chroma_${dateStr}`]) : (idx === 0);
 
               return (
                 <div key={dateStr} className="bg-white border border-slate-200 hover:border-indigo-200 rounded-2xl shadow-xs overflow-hidden transition-all">

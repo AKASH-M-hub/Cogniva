@@ -55,6 +55,7 @@ def get_knowledge_gaps(db: Session = Depends(get_db)):
             "id": g.id,
             "query": g.unanswered_query,
             "department": g.department or "General",
+            "employee": g.user_email or "Unknown",
             "attempts": g.attempt_count,
             "status": g.status,
             "created_at": g.created_at.strftime("%Y-%m-%d %H:%M") if g.created_at else "Recently"

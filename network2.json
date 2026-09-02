@@ -1,0 +1,64 @@
+﻿[
+    {
+        "Name": "cogniva_default",
+        "Id": "f92f9a777ed729c3ef3b3e2c637d102d017879c928310b77dba4410978bf8b1f",
+        "Created": "2026-09-02T05:15:08.670590683Z",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv4": true,
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": null,
+            "Config": [
+                {
+                    "Subnet": "172.19.0.0/16",
+                    "Gateway": "172.19.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Options": {
+            "com.docker.network.enable_ipv4": "true",
+            "com.docker.network.enable_ipv6": "false"
+        },
+        "Labels": {
+            "com.docker.compose.config-hash": "1b706915199d59ea4da2cf56fda4836e313701226860f553f9aa674f357f4310",
+            "com.docker.compose.network": "default",
+            "com.docker.compose.project": "cogniva",
+            "com.docker.compose.version": "5.4.0"
+        },
+        "Containers": {
+            "8d035e254bead876cc4294415ebf803afd8cafa956bcd36ac1567e8522f958ca": {
+                "Name": "cogniva_n8n",
+                "EndpointID": "32617a7542f209cb43716e8f41adaac80cf10dd4fac3f6629aabee05ff5272f0",
+                "MacAddress": "c2:5e:5c:8d:b0:47",
+                "IPv4Address": "172.19.0.3/16",
+                "IPv6Address": ""
+            },
+            "e791bbf3acb2e044ae0e25dc1c0dd88917f310cb09fb53370967cbd6980cf26b": {
+                "Name": "cogniva_postgres",
+                "EndpointID": "95048fc93ef88e3b93838e6a6ae6a6bfc852b81ac4b0a9a17175a7b46e6d7409",
+                "MacAddress": "5a:5f:df:4b:99:c6",
+                "IPv4Address": "172.19.0.2/16",
+                "IPv6Address": ""
+            }
+        },
+        "Status": {
+            "IPAM": {
+                "Subnets": {
+                    "172.19.0.0/16": {
+                        "IPsInUse": 5,
+                        "DynamicIPsAvailable": 65531
+                    }
+                }
+            }
+        }
+    }
+]

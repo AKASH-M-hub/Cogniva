@@ -18,7 +18,6 @@ class Document(Base):
     total_chunks = Column(Integer, default=0)
     status = Column(String(50), default="Indexed & Active")
     upload_date = Column(DateTime(timezone=True), server_default=func.now())
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
 
@@ -33,6 +32,5 @@ class DocumentChunk(Base):
     token_count = Column(Integer, default=0)
     page = Column(Integer, nullable=True)
     chroma_doc_id = Column(String(255), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     document = relationship("Document", back_populates="chunks")

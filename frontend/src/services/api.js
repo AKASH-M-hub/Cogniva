@@ -4,7 +4,7 @@ const API_BASE_URL = 'http://localhost:8000';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 60000,
+  timeout: 0,
 });
 
 export const searchAgentAPI = {
@@ -101,11 +101,13 @@ export const responseAgentAPI = {
 
 export const knowledgeHubAPI = {
   // Upload physical document (PDF, DOCX, TXT)
-  uploadDocument: async (file) => {
+  uploadDocument: async (file, userEmail = "akashm.student@saveetha.ac.in") => {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const response = await api.post('/upload/', formData, {
+      formData.append('user_email', userEmail);
+      // Route document upload through n8n automation webhook (via backend proxy to bypass CORS)
+      const response = await api.post('/upload/n8n-proxy', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       return response.data;
@@ -504,6 +506,54 @@ export const analyticsAgentAPI = {
     } catch (error) {
       console.error('Resolve Knowledge Gap error:', error);
       return { success: false };
+    }
+  }
+};
+
+export const adminAPI = {
+  getEmployees: async () => {
+    try {
+      const response = await api.get('/api/admin/employees');
+      return response.data;
+    } catch (error) {
+      console.error('getEmployees error:', error);
+      return [];
+    }
+  },
+  deleteEmployee: async (employeeId) => {
+    try {
+      const response = await api.delete(`/api/admin/employees/${employeeId}`);
+      return response.data;
+    } catch (error) {
+      console.error('deleteEmployee error:', error);
+      return { success: false, message: 'Failed to delete' };
+    }
+  },
+  setVectorPassword: async (new_password) => {
+    try {
+      const response = await api.post('/api/admin/vector-password', { new_password });
+      return response.data;
+    } catch (error) {
+      console.error('setVectorPassword error:', error);
+      throw error;
+    }
+  },
+  getVectorPassword: async () => {
+    try {
+      const response = await api.get('/api/admin/vector-password');
+      return response.data;
+    } catch (error) {
+      console.error('getVectorPassword error:', error);
+      return { password: 'error' };
+    }
+  },
+  sendNotification: async (payload) => {
+    try {
+      const response = await api.post('/api/admin/notify', payload);
+      return response.data;
+    } catch (error) {
+      console.error('sendNotification error:', error);
+      return { error: true, detail: error.response?.data?.detail || 'Failed to send notification' };
     }
   }
 };

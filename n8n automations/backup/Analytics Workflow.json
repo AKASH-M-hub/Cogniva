@@ -1,0 +1,185 @@
+{
+  "name": "Analytics Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                6
+              ],
+              "triggerAtHour": 17
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4bc3c444-8b7a-4c09-b66d-c5620903b164",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json;\n\nconst report = `\n<h2>Cogniva Weekly Analytics Report</h2>\n\n<p>Hello ${data.name},</p>\n\n<p>Here is your weekly Cogniva analytics report.</p>\n\n<hr>\n\n<h3>Your Activity</h3>\n\n<ul>\n  <li><strong>Department:</strong> ${data.department}</li>\n  <li><strong>Queries:</strong> ${data.weekly_queries}</li>\n  <li><strong>AI Responses:</strong> ${data.weekly_responses}</li>\n  <li><strong>Sessions:</strong> ${data.weekly_sessions}</li>\n  <li><strong>Report Period:</strong> ${data.timeframe}</li>\n</ul>\n\n<hr>\n\n<p>This report was generated automatically by Cogniva.</p>\n`;\n\nreturn {\n  json: {\n    ...data,\n    report: report,\n    report_period: data.timeframe\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        -16
+      ],
+      "id": "aecaf83c-f255-4846-912d-319510659960",
+      "name": "Generate Weekly Report"
+    },
+    {
+      "parameters": {
+        "fromEmail": "akashmohanraj333@gmail.com",
+        "toEmail": "={{ $json.email }}",
+        "subject": "=Cogniva Weekly Analytics Report - {{ $json.report_period }}",
+        "html": "={{ $json.report }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1248,
+        -16
+      ],
+      "id": "05a10b70-28ab-4f6e-8953-eb7c57ffe8ec",
+      "name": "Send an Email",
+      "webhookId": "02850ceb-34d4-45d8-95ae-c5c86c1799b4",
+      "credentials": {
+        "smtp": {
+          "id": "nqJcN9wNPCNos5eF",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8000/analytics/report-users",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "38ce94e9-1cc9-436d-9c25-4530522a85ac",
+      "name": "Get All Report Users"
+    },
+    {
+      "parameters": {
+        "url": "=http://host.docker.internal:8000/analytics/user/{{$json.user_id}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        432,
+        -160
+      ],
+      "id": "d97a485a-1bb4-4842-a5d9-ece4ff969dbe",
+      "name": "Get User Analytics"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "user_id",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        672,
+        -16
+      ],
+      "id": "6feab67c-8177-492b-835b-87a7f4577ab3",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get All Report Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Weekly Report": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Report Users": {
+      "main": [
+        [
+          {
+            "node": "Get User Analytics",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get User Analytics": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Generate Weekly Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "6222ca1d-e8bd-4a09-aa1e-2942c1758fae",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8f15cab25be3279f117900bcf48746152a10428ad3e332c593f69cf9d829e795"
+  },
+  "nodeGroups": [],
+  "id": "e4pe9cvxtc5KUo3F",
+  "tags": []
+}

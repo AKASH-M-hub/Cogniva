@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------
+  # 1. PostgreSQL Database (Core Business Data)
+  # ---------------------------------------------------------
+  postgres:
+    image: postgres:15
+    container_name: cogniva_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password    # Update these if your local credentials differ
+      POSTGRES_DB: cogniva_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cogniva_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------
+  # 2. n8n (Enterprise Automations & Alert Pipelines)
+  # ---------------------------------------------------------
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: cogniva_n8n
+    restart: unless-stopped
+    environment:
+      - GENERIC_TIMEZONE=Asia/Kolkata
+      - TZ=Asia/Kolkata
+      # N8N Database Config (points to the postgres container above)
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_DATABASE=cogniva_db
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_USER=postgres
+      - DB_POSTGRESDB_PASSWORD=password
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  # Persistent volumes to ensure you don't lose data when containers restart
+  postgres_data:
+  n8n_data:

@@ -135,7 +135,7 @@ def get_search_analytics():
 
 @router.get("/history")
 def get_search_history(
-    limit: int = 50,
+    limit: int = 500,
     db: Session = Depends(get_db)
 ):
     """

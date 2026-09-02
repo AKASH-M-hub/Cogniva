@@ -10,6 +10,8 @@ import AnalyticsAgentWorkspace from './components/analytics/AnalyticsAgentWorksp
 import DashboardWorkspace from './components/dashboard/DashboardWorkspace';
 import AdminWorkspace from './components/admin/AdminWorkspace';
 import SettingsWorkspace from './components/settings/SettingsWorkspace';
+import AuthPages from './components/auth/AuthPages';
+import MemoryAgentWorkspace from './components/memory/MemoryAgentWorkspace';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -66,21 +68,32 @@ class ErrorBoundary extends React.Component {
 }
 
 function App() {
-  // On fresh website visit: default to SaaS Intro Landing Page ('dashboard')
-  // On page refresh (F5): preserve the active workspace page user was viewing
   const [activeWorkspace, setActiveWorkspaceState] = useState(() => {
     const isReload = performance.getEntriesByType('navigation')?.[0]?.type === 'reload';
-    const savedWorkspace = sessionStorage.getItem('cogniva_active_workspace');
+    const savedWorkspace = localStorage.getItem('cogniva_active_workspace');
+    const savedUser = localStorage.getItem('cogniva_user');
+    
+    // Always show SaaS page first if not authenticated
+    if (!savedUser) {
+      return 'dashboard';
+    }
+
     if (isReload && savedWorkspace) {
       return savedWorkspace;
     }
     return 'dashboard';
   });
+  
+  const [sessionUser, setSessionUser] = useState(() => {
+    const saved = localStorage.getItem('cogniva_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  
   const [selectedSearchContext, setSelectedSearchContext] = useState(null);
 
   const setActiveWorkspace = (workspace) => {
     setActiveWorkspaceState(workspace);
-    sessionStorage.setItem('cogniva_active_workspace', workspace);
+    localStorage.setItem('cogniva_active_workspace', workspace);
   };
 
   const handleViewAIResponse = (searchContext) => {
@@ -88,7 +101,6 @@ function App() {
     setActiveWorkspace('response-agent');
   };
 
-  // If on the SaaS Intro Page ('dashboard'), display full-screen landing page layout without sidebar
   const isSaaSPage = activeWorkspace === 'dashboard' || activeWorkspace === 'saas-page';
 
   if (isSaaSPage) {
@@ -101,68 +113,111 @@ function App() {
     );
   }
 
+  // If not on SaaS page and NOT logged in, show Auth Pages
+  if (!sessionUser) {
+    return (
+      <ErrorBoundary key="auth-pages">
+         <AuthPages 
+            onBackToSaaS={() => setActiveWorkspace('dashboard')}
+            onLoginSuccess={(user) => {
+               setSessionUser(user);
+               if (user.user_type === 'org_admin') {
+                  setActiveWorkspace('provisioning');
+               } else if (user.user_type === 'employee') {
+                  setActiveWorkspace('knowledge-hub');
+               } else if (user.user_type === 'cogniva_admin') {
+                  setActiveWorkspace('admin-orchestrator');
+               }
+            }} 
+         />
+      </ErrorBoundary>
+    );
+  }
+
+  // Enforce role-based workspace locking
+  const isEmployee = sessionUser?.user_type === 'employee';
+  
+  // If employee tries to access admin routes, forcefully redirect to knowledge-hub
+  let effectiveWorkspace = activeWorkspace;
+  if (isEmployee && ['provisioning', 'directory', 'performance', 'network', 'admin', 'admin-orchestrator', 'ai-orchestrator'].includes(effectiveWorkspace)) {
+    effectiveWorkspace = 'knowledge-hub';
+  }
+
+  // If org_admin is lost, coerce to provisioning
+  const isOrgAdmin = sessionUser?.user_type === 'org_admin';
+  if (isOrgAdmin && !['provisioning', 'directory'].includes(effectiveWorkspace)) {
+    effectiveWorkspace = 'provisioning';
+  }
+
+  // If cogniva_admin is lost, coerce to network
+  const isCognivaAdmin = sessionUser?.user_type === 'cogniva_admin';
+  if (isCognivaAdmin && !['network', 'directory'].includes(effectiveWorkspace)) {
+    effectiveWorkspace = 'network';
+  }
+
   return (
     <div className="flex min-h-screen bg-[#F8F9FA] text-[#0F172A] font-sans antialiased">
-      {/* Sidebar Navigation - Visible in Enterprise Workspace */}
-      <Sidebar activeWorkspace={activeWorkspace} setActiveWorkspace={setActiveWorkspace} />
+      <Sidebar activeWorkspace={effectiveWorkspace} setActiveWorkspace={setActiveWorkspace} sessionUser={sessionUser} />
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Navbar */}
-        <TopNavbar activeWorkspace={activeWorkspace} setActiveWorkspace={setActiveWorkspace} />
+        <TopNavbar activeWorkspace={effectiveWorkspace} setActiveWorkspace={setActiveWorkspace} />
 
         {/* Dynamic Workspace Container */}
         <main className="flex-1 bg-[#F8F9FA]">
-          <ErrorBoundary key={activeWorkspace}>
-            {activeWorkspace === 'ai-orchestrator' && (
+          <ErrorBoundary key={effectiveWorkspace}>
+            {effectiveWorkspace === 'ai-orchestrator' && (
               <OrchestratorWorkspace
                 onNavigateToResponse={() => setActiveWorkspace('response-agent')}
                 onNavigateToAgent={(agentId) => setActiveWorkspace(agentId)}
               />
             )}
 
-            {activeWorkspace === 'search-agent' && (
+            {effectiveWorkspace === 'search-agent' && (
               <SearchAgentWorkspace
                 onViewAIResponse={handleViewAIResponse}
                 onNavigateToKnowledge={() => setActiveWorkspace('knowledge-hub')}
               />
             )}
 
-            {(activeWorkspace === 'response-agent' || activeWorkspace === 'ai-workspace') && (
+            {(effectiveWorkspace === 'response-agent' || effectiveWorkspace === 'ai-workspace') && (
               <ResponseAgentWorkspace selectedContext={selectedSearchContext} />
             )}
 
-            {activeWorkspace === 'decision-agent' && (
+            {effectiveWorkspace === 'decision-agent' && (
               <DecisionAgentWorkspace onNavigateToResponse={() => setActiveWorkspace('response-agent')} />
             )}
+
+            {(effectiveWorkspace === 'memory-agent' || effectiveWorkspace === 'memory-vault') && (
+              <MemoryAgentWorkspace />
+            )}
             
-            {(activeWorkspace === 'knowledge-hub' ||
-              activeWorkspace === 'add-knowledge' ||
-              activeWorkspace === 'documents') && (
+            {(effectiveWorkspace === 'knowledge-hub' ||
+              effectiveWorkspace === 'add-knowledge' ||
+              effectiveWorkspace === 'documents') && (
               <KnowledgeHubWorkspace
-                activeWorkspace={activeWorkspace}
+                activeWorkspace={effectiveWorkspace}
                 onNavigateToSearch={() => setActiveWorkspace('search-agent')}
                 onNavigateToResponse={() => setActiveWorkspace('response-agent')}
               />
             )}
 
-            {(activeWorkspace === 'analytics-agent' || activeWorkspace === 'analytics') && (
+            {(effectiveWorkspace === 'analytics-agent' || effectiveWorkspace === 'analytics') && (
               <AnalyticsAgentWorkspace />
             )}
 
-            {(activeWorkspace === 'admin' || activeWorkspace === 'admin-orchestrator') && (
-              <AdminWorkspace onNavigateToKnowledge={() => setActiveWorkspace('knowledge-hub')} />
+            {(effectiveWorkspace === 'provisioning' || effectiveWorkspace === 'directory' || effectiveWorkspace === 'performance' || effectiveWorkspace === 'network') && (
+              <AdminWorkspace activeModule={effectiveWorkspace} />
             )}
 
-            {activeWorkspace === 'settings' && (
+            {effectiveWorkspace === 'settings' && (
               <SettingsWorkspace />
             )}
 
             {/* Workspace fallback view for unhandled routes */}
-            {!['dashboard', 'ai-orchestrator', 'search-agent', 'response-agent', 'ai-workspace', 'memory-vault', 'memory-agent', 'decision-agent', 'knowledge-hub', 'add-knowledge', 'documents', 'analytics', 'analytics-agent', 'admin', 'admin-orchestrator', 'settings'].includes(activeWorkspace) && (
+            {!['dashboard', 'ai-orchestrator', 'search-agent', 'response-agent', 'ai-workspace', 'memory-vault', 'memory-agent', 'decision-agent', 'knowledge-hub', 'add-knowledge', 'documents', 'analytics', 'analytics-agent', 'admin', 'admin-orchestrator', 'provisioning', 'directory', 'performance', 'settings'].includes(effectiveWorkspace) && (
               <div className="p-8 max-w-7xl mx-auto space-y-6 text-left">
                 <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xs">
-                  <h1 className="text-2xl font-bold text-slate-900 capitalize">{activeWorkspace.replace('-', ' ')}</h1>
+                  <h1 className="text-2xl font-bold text-slate-900 capitalize">{effectiveWorkspace.replace('-', ' ')}</h1>
                   <p className="text-slate-500 text-sm mt-1">
                     Cogniva Enterprise Intelligence Platform • Select Knowledge Hub, Search Agent, or Response Agent from the sidebar.
                   </p>

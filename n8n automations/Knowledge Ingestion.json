@@ -1,0 +1,134 @@
+{
+  "name": "Knowledge Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "knowledge-upload",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "513c8201-ee59-4b3d-82d6-f576bd68146b",
+      "name": "Webhook",
+      "webhookId": "d185fe6f-2616-4309-ad7b-32eeb423e390"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/upload/",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "file"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        272,
+        0
+      ],
+      "id": "dc8a3ddb-4e57-4020-84db-30300c2d8a15",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "options": {},
+        "responseBody": "={{ $json }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        544,
+        0
+      ],
+      "id": "4d87c0d0-a8fb-41f1-984d-66ebef885124",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "fromEmail": "akashmohanraj333@gmail.com",
+        "toEmail": "akashm.student@saveetha.ac.in",
+        "subject": "Cogniva Knowledge Ingestion Success",
+        "html": "<html><body><h3>Cogniva Knowledge Ingestion Success</h3><p>A new document was successfully ingested.</p><p>Response: {{ $json.message }}</p></body></html>",
+        "options": {},
+        "text": "A new document was successfully ingested.\n\nResponse: {{ $json.message }}"
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        800,
+        0
+      ],
+      "id": "44d8122b-c27e-4a0e-9cf1-bf52cab6e2db",
+      "name": "Send an Email",
+      "webhookId": "8f33b650-75ed-4639-bdd6-ae50bb6921a9",
+      "credentials": {
+        "smtp": {
+          "id": "nqJcN9wNPCNos5eF",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all",
+    "saveExecutionProgress": true
+  },
+  "versionId": "5cf13518-96f9-4a89-a391-eec4f8ae413b",
+  "meta": {
+    "instanceId": "8f15cab25be3279f117900bcf48746152a10428ad3e332c593f69cf9d829e795"
+  },
+  "nodeGroups": [],
+  "id": "D6qGgqYw7GURsVnm",
+  "tags": []
+}

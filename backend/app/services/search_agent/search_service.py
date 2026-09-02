@@ -195,10 +195,44 @@ def execute_enterprise_search(
                     continue
 
                 doc_lower = doc.lower()
-                kw_matches = sum(1 for kw in keywords if kw in doc_lower)
+                filename_lower = filename.lower()
+                
+                # Precise whole-word matching to avoid substring false positives (e.g. 'thor' in 'authors')
+                kw_counts = {}
+                for kw in keywords:
+                    # Check in document content
+                    matches = len(re.findall(rf"\b{re.escape(kw)}\b", doc_lower))
+                    # Check in filename snippet (allow partial matches for filename)
+                    if len(kw) > 3 and kw in filename_lower:
+                        matches += 5
+                        
+                    if matches > 0:
+                        kw_counts[kw] = matches
+                        
+                unique_kw_matches = len(kw_counts)
 
-                if kw_matches > 0:
-                    kw_score = round(min(0.95, (kw_matches / max(len(keywords), 1)) * 0.75 + 0.20), 4)
+                if unique_kw_matches > 0:
+                    # Calculate continuous proper score using asymptotic BM25-style TF (Term Frequency) calculation
+                    total_term_freq = sum(kw_counts.values())
+                    unique_ratio = unique_kw_matches / max(len(keywords), 1)
+                    
+                    # Compute TF Factor: TF / (TF + k) to naturally curve to 1.0 without hard caps
+                    k = 2.0
+                    tf_factor = total_term_freq / (total_term_freq + k)
+                    
+                    # 1. Base Score represents purely conceptual uniqueness match (up to 0.60 typically)
+                    kw_base_score = 0.30 + (unique_ratio * 0.30)
+                    
+                    # 2. Add unbounded asymptotic frequency scoring (varies uniquely for every chunk)
+                    # More hits = closer to +0.38 without ever snapping arbitrarily against a wall
+                    freq_score = tf_factor * 0.38
+                    
+                    kw_score = round(kw_base_score + freq_score, 4)
+                    
+                    # Guaranteed inclusion if we heavily matched the filename
+                    if any(len(kw) > 4 and kw in filename_lower for kw in keywords):
+                        kw_score = max(kw_score, threshold + 0.15)
+                    
                     if kw_score >= threshold:
                         raw_chunks.append({
                             "chunk_id": hit_id,
@@ -307,7 +341,8 @@ def execute_enterprise_search(
         query=query,
         results_count=len(document_results),
         latency_ms=latency_ms,
-        user_department=department
+        user_department=department,
+        user_id=user_id
     )
     analytics_summary = get_search_analytics_report()
 

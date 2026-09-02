@@ -1,5 +1,5 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
-from fastapi.responses import FileResponse, Response
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form
+from fastapi.responses import FileResponse, Response, HTMLResponse
 from typing import Optional
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -28,18 +28,58 @@ class KnowledgeTextRequest(BaseModel):
     tags: Optional[str] = ""
 
 
+@router.post("/n8n-proxy")
+async def n8n_proxy(file: UploadFile = File(...), user_email: str = Form("default@cogniva.ai")):
+    """Proxies the upload to n8n automation webhook to bypass browser CORS limitations."""
+    import httpx
+    
+    file_bytes = await file.read()
+    files = {'file': (file.filename, file_bytes, file.content_type)}
+    data = {'user_email': user_email}
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post("http://localhost:5678/webhook/knowledge-upload", data=data, files=files, timeout=60.0)
+            
+        if resp.status_code != 200:
+            raise HTTPException(status_code=500, detail=f"n8n webhook returned error code {resp.status_code}: {resp.text}")
+        
+        try:
+            return resp.json()
+        except Exception:
+            return {"success": True, "message": resp.text}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"n8n proxy error: {str(e)}")
+
+
+
 @router.post("/")
-async def upload_document(
+def upload_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
     """Uploads document (PDF, TXT, DOCX), stores metadata in PostgreSQL and vector embeddings in ChromaDB."""
     try:
         from app.models.document import Document as DocModel, DocumentChunk as ChunkModel
+        
+        timestamp_prefix = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        original_filename = file.filename
+        file.filename = f"{timestamp_prefix}_{file.filename}"
 
         file_path = save_pdf(file)
         extracted_text = extract_text(file_path)
         
+        # Analyze if this file is already perfectly present in the DB
+        existing_docs = db.query(DocModel).filter(DocModel.file_size == len(extracted_text)).all()
+        for doc in existing_docs:
+            if doc.filename.endswith(f"_{original_filename}") or doc.filename == original_filename:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                raise HTTPException(
+                    status_code=409, 
+                    detail=f"Analysis Complete: The file '{original_filename}' is already present in the Database. It needs not to be uploaded again."
+                )
+
         if not extracted_text.strip():
             extracted_text = f"Document: {file.filename}\nContent uploaded to Knowledge Hub."
 
@@ -113,6 +153,7 @@ async def add_knowledge_text(
     try:
         # 1. Save to PostgreSQL database (pgAdmin accessible)
         try:
+            from app.models.memory import Memory
             memory_record = Memory(
                 department=request.department or "Engineering",
                 title=request.title,
@@ -140,9 +181,11 @@ async def add_knowledge_text(
             f"REASON / CONTEXT: {request.reason}"
         )
         
-        virtual_filename = f"{request.department}_{request.title.replace(' ', '_')}.txt"
-        chunks = chunk_text(combined_text)
         now_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        timestamp_suffix = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        virtual_filename = f"{request.department}_{request.title.replace(' ', '_')}_{timestamp_suffix}.txt"
+        
+        chunks = chunk_text(combined_text)
         stored_chunks = store_embeddings(
             filename=virtual_filename,
             chunks=chunks,
@@ -224,7 +267,7 @@ def get_upload_history(db: Session = Depends(get_db)):
                 "department": mem.department or "Engineering",
                 "size_bytes": len(mem.decision or ""),
                 "size_formatted": f"{len(mem.decision or '')} chars",
-                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "timestamp": mem.created_at.strftime("%Y-%m-%d %H:%M") if hasattr(mem, 'created_at') and mem.created_at else datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
                 "status": "Indexed in PostgreSQL & ChromaDB",
                 "source": "Memory Vault Entry",
                 "priority": mem.priority or "Medium",
@@ -420,15 +463,51 @@ def get_chroma_history():
 
 
 @router.get("/file/{filename}")
-def get_file_content(filename: str):
-    """Serves the actual document file download / view stream."""
+def get_file_content(filename: str, download: bool = False, db: Session = Depends(get_db)):
+    """Serves the actual document file download / view stream, or dynamically generates memory records."""
+    import mimetypes
+    
     uploads_dir = "uploads"
     file_path = os.path.join(uploads_dir, filename)
     if os.path.exists(file_path) and os.path.isfile(file_path):
+        # Native browsers cannot render .docx files online, they auto-download.
+        # If the user wants to truly view it online without downloading, we fallback to a clean text HTML extraction wrap.
+        if not download and (filename.lower().endswith(".docx") or filename.lower().endswith(".doc")):
+            try:
+                import mammoth
+                with open(file_path, "rb") as docx_file:
+                    result = mammoth.convert_to_html(docx_file)
+                    extracted = result.value
+            except Exception:
+                extracted = extract_text(file_path)
+            
+            html_content = f"<html><head><title>{filename}</title></head><body style='padding:40px; font-family:sans-serif; background-color:#f8fafc;'><div style='max-width:900px; margin:0 auto; background:white; padding:50px; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.1); line-height:1.6; color:#334155;'>{extracted}</div></body></html>"
+            return HTMLResponse(content=html_content)
+
+        mime_type, _ = mimetypes.guess_type(file_path)
+        media_type = mime_type or "application/octet-stream"
+        
         return FileResponse(
             path=file_path,
             filename=filename,
-            media_type="application/octet-stream"
+            media_type=media_type,
+            content_disposition_type="attachment" if download else "inline"
         )
-    
-    raise HTTPException(status_code=404, detail="File not found on server")
+    else:
+        # Fallback: check if the filename matches a Structured Memory title in the DB
+        from app.models.memory import Memory
+        mem = db.query(Memory).filter(Memory.title == filename).first()
+        if mem:
+            content = f"MEMORY TITLE: {mem.title}\nDEPARTMENT: {mem.department or 'N/A'}\nPRIORITY: {mem.priority or 'N/A'}\n\nCONTENT PAYLOAD:\n{mem.decision or mem.reason or ''}"
+            
+            if not download:
+                html_content = f"<html><head><title>{filename}</title></head><body style='padding:40px; font-family:sans-serif; background-color:#f8fafc;'><div style='max-width:900px; margin:0 auto; background:white; padding:50px; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.1); line-height:1.6; color:#334155; white-space:pre-wrap;'>{content}</div></body></html>"
+                return HTMLResponse(content=html_content)
+            else:
+                return Response(
+                    content=content,
+                    media_type="text/plain",
+                    headers={"Content-Disposition": f"attachment; filename=\"{filename}.txt\""}
+                )
+
+    raise HTTPException(status_code=404, detail="File or Memory not found on server")

@@ -43,7 +43,7 @@ def get_response_telemetry(db: Session) -> Dict[str, Any]:
     total_responses = db.query(ResponseHistory).count()
     
     # Calculate real average response time if records exist
-    avg_resp_time = db.query(func.avg(ResponseHistory.response_time_ms)).scalar()
+    avg_resp_time = db.query(func.avg(ResponseHistory.response_time)).scalar()
     avg_response_time = round(float(avg_resp_time), 1) if avg_resp_time else 0.0
 
     return {
@@ -113,7 +113,7 @@ def get_enterprise_telemetry(db: Session) -> Dict[str, Any]:
     total_docs = db.query(Document).count()
     top_docs = (
         db.query(Document.title, Document.department, Document.file_type)
-        .order_by(desc(Document.created_at))
+        .order_by(desc(Document.upload_date))
         .limit(5)
         .all()
     )

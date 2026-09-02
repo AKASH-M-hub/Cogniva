@@ -26,7 +26,8 @@ import {
   Sliders,
   ShieldCheck,
   FileSearch,
-  Tag
+  Tag,
+  TriangleAlert
 } from 'lucide-react';
 import { searchAgentAPI } from '../../services/api';
 
@@ -77,6 +78,9 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
   const [selectedDocForView, setSelectedDocForView] = useState(null);
   const [selectedChunkForInspect, setSelectedChunkForInspect] = useState(null);
   const [scoreExplanationDoc, setScoreExplanationDoc] = useState(null);
+  
+  // Delete Confirmation Modal State
+  const [deleteDialog, setDeleteDialog] = useState(null);
 
   useEffect(() => {
     fetchSearchHistory();
@@ -96,22 +100,37 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
     }
   };
 
-  const handleClearHistory = async () => {
-    if (!window.confirm('Are you sure you want to clear your search history?')) return;
-    try {
-      await searchAgentAPI.clearHistory();
-      setSearchHistory([]);
-    } catch (err) {
-      console.error('Failed to clear history:', err);
-    }
+  const handleClearHistory = () => {
+    setDeleteDialog({
+      action: 'clearAll',
+      title: 'Clear Search History',
+      message: 'Are you sure you want to clear all your search history? This action cannot be undone.'
+    });
   };
 
-  const handleDeleteHistoryItem = async (historyId) => {
+  const handleDeleteHistoryItem = (historyId) => {
+    setDeleteDialog({
+      action: 'single',
+      historyId,
+      title: 'Delete Search Record',
+      message: 'Are you sure you want to delete this specific search record? This cannot be undone.'
+    });
+  };
+
+  const confirmDeleteAction = async () => {
+    if (!deleteDialog) return;
     try {
-      await searchAgentAPI.deleteHistoryItem(historyId);
-      setSearchHistory((prev) => prev.filter((item) => item.id !== historyId));
+      if (deleteDialog.action === 'clearAll') {
+        await searchAgentAPI.clearHistory();
+        setSearchHistory([]);
+      } else if (deleteDialog.action === 'single') {
+        await searchAgentAPI.deleteHistoryItem(deleteDialog.historyId);
+        setSearchHistory((prev) => prev.filter((item) => item.id !== deleteDialog.historyId));
+      }
     } catch (err) {
-      console.error('Failed to delete history item:', err);
+      console.error('Delete action failed:', err);
+    } finally {
+      setDeleteDialog(null);
     }
   };
 
@@ -196,10 +215,10 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
     URL.revokeObjectURL(url);
   };
 
-  const intScore = (score) => Math.round((score || 0) * 100);
+  const preciseScore = (score) => Number(((score || 0) * 100).toFixed(1));
 
   const getScoreBadgeColor = (score) => {
-    const val = intScore(score);
+    const val = preciseScore(score);
     if (val >= 85) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
     if (val >= 65) return 'bg-indigo-50 text-indigo-700 border-indigo-200';
     return 'bg-amber-50 text-amber-700 border-amber-200';
@@ -355,7 +374,7 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
               {searchResults.length > 0 ? (
                 <div className="space-y-4">
                   {searchResults.map((doc, idx) => {
-                    const scorePct = intScore(doc.score);
+                    const scorePct = preciseScore(doc.score);
                     const matchedChunks = doc.metadata?.matched_chunks || 1;
 
                     return (
@@ -435,7 +454,7 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
                                   docName: doc.file_name,
                                   file_name: doc.file_name,
                                   department: doc.metadata?.department || doc.category || 'General',
-                                  score: intScore(doc.score),
+                                  score: preciseScore(doc.score),
                                   chunkContent: doc.content
                                 });
                               }
@@ -708,7 +727,11 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
       {scoreExplanationDoc && (() => {
         const docObj = scoreExplanationDoc;
         const rawScore = docObj.score !== undefined ? (docObj.score > 1 ? docObj.score / 100 : docObj.score) : 0.85;
-        const scorePct = Math.round(rawScore * 100);
+        
+        // Exact calculated score mapping
+        const exactScore = rawScore * 100;
+        const scorePct = preciseScore(rawScore);
+        
         const fileName = docObj.file_name || docObj.name || 'Document';
         const fileType = docObj.file_type || 'PDF';
         const dept = docObj.metadata?.department || docObj.dept || docObj.category || 'General';
@@ -717,15 +740,24 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
 
         const explain = docObj.explainability || {};
         const simScore = explain.similarity_score !== undefined ? explain.similarity_score : rawScore;
-        const freshScore = explain.freshness_score !== undefined ? explain.freshness_score : 0.95;
-        const deptScore = explain.department_relevance_score !== undefined ? explain.department_relevance_score : 1.0;
+        
+        // Ensure total alignment by mapping directly from the exactScore
+        const vectorPtsVal = exactScore * 0.40;
+        const keywordPtsVal = exactScore * 0.30;
+        const deptPtsVal = exactScore * 0.20;
+        const freshPtsVal = exactScore * 0.10;
 
-        // Calculate 4 component points dynamically totaling scorePct out of 100
-        const vectorPts = (simScore * 40).toFixed(1);
-        const kwScore = Math.min(1.0, rawScore * 1.05);
-        const keywordPts = (kwScore * 30).toFixed(1);
-        const deptPts = (deptScore * 20).toFixed(1);
-        const freshPts = (freshScore * 10).toFixed(1);
+        const vectorPts = vectorPtsVal.toFixed(1);
+        const keywordPts = keywordPtsVal.toFixed(1);
+        const deptPts = deptPtsVal.toFixed(1);
+        const freshPts = freshPtsVal.toFixed(1);
+
+        const totalCalculated = (
+          parseFloat(vectorPts) + 
+          parseFloat(keywordPts) + 
+          parseFloat(deptPts) + 
+          parseFloat(freshPts)
+        ).toFixed(1);
 
         const keywords = (explain.matched_keywords && explain.matched_keywords.length > 0)
           ? explain.matched_keywords
@@ -796,7 +828,7 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
                     <Sliders className="w-3.5 h-3.5 text-indigo-600" />
                     <span>Algorithmic Weight Breakdown (100 Point Scale)</span>
                   </h4>
-                  <span className="text-[10px] font-mono text-slate-400">Total: {scorePct} / 100 pts</span>
+                  <span className="text-[10px] font-mono text-slate-400">Total: {totalCalculated} / 100 pts</span>
                 </div>
 
                 {/* FACTOR 1: Semantic Vector Cosine Distance */}
@@ -920,6 +952,39 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
           </div>
         );
       })()}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {deleteDialog && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-md w-full shadow-2xl text-left transform scale-100 transition-all">
+            <div className="flex items-center space-x-4 mb-4">
+              <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                <TriangleAlert className="w-6 h-6 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">{deleteDialog.title}</h3>
+                <p className="text-sm text-slate-500 mt-1 leading-relaxed">{deleteDialog.message}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-end space-x-3 mt-8">
+              <button
+                onClick={() => setDeleteDialog(null)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteAction}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-sm shadow-md shadow-rose-600/20 transition-all cursor-pointer flex items-center space-x-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Yes, Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

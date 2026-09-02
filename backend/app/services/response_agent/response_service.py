@@ -43,7 +43,7 @@ def generate_llm_text(prompt: str) -> str:
         "stream": False
     }
     try:
-        response = requests.post(url, json=payload, timeout=10)
+        response = requests.post(url, json=payload, timeout=300)
         response.raise_for_status()
         data = response.json()
         return data.get("response", "").strip()
@@ -193,8 +193,6 @@ def execute_response_agent_pipeline(request: ChatRequest) -> ChatResponse:
     # 7. LLM Generation (with fast fallback for 8GB RAM performance)
     raw_llm_answer = generate_llm_text(prompt)
 
-    if raw_llm_answer.startswith("Error contacting Ollama"):
-        raw_llm_answer = synthesize_fast_response(raw_question, search_res.results, doc_context)
 
     # 8. Hallucination Validator & Agentic Self-Reflection Loop
     is_valid, confidence_score, validation_notes = verify_hallucination_and_evidence(

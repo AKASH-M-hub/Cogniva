@@ -23,4 +23,5 @@ class KnowledgeGapModel(Base):
     department = Column(String(100), default="Engineering & Product")
     attempt_count = Column(Integer, default=1)
     status = Column(String(50), default="Pending Resolution")  # Pending Resolution, Resolved
+    user_email = Column(String(255), default="Unknown")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

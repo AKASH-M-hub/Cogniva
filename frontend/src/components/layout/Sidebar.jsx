@@ -5,18 +5,45 @@ import {
   Brain,
   BarChart3,
   Settings,
-  ShieldCheck
+  ShieldCheck,
+  LogOut,
+  UserPlus,
+  Users,
+  BarChart2
 } from 'lucide-react';
 
-export default function Sidebar({ activeWorkspace, setActiveWorkspace }) {
-  const userNavItems = [
+export default function Sidebar({ activeWorkspace, setActiveWorkspace, sessionUser }) {
+  // Determine if falling back to localStorage if sessionUser wasn't perfectly passed yet
+  const user = sessionUser || JSON.parse(localStorage.getItem('cogniva_user') || '{}');
+  const isOrgAdmin = user?.user_type === 'org_admin';
+  const isCognivaAdmin = user?.user_type === 'cogniva_admin';
+  const isEmployee = user?.user_type === 'employee';
+
+  let adminNavItems = [];
+  if (isCognivaAdmin) {
+    adminNavItems = [
+      { id: 'network', label: 'Global Network', icon: Users },
+      { id: 'directory', label: 'Org Admin Directory', icon: Users }
+    ];
+  } else if (isOrgAdmin) {
+    adminNavItems = [
+      { id: 'provisioning', label: 'Provision Employees', icon: UserPlus },
+      { id: 'directory', label: 'Access & Directory', icon: Users }
+    ];
+  }
+
+  const employeeItems = [
     { id: 'knowledge-hub', label: 'Knowledge Hub', icon: BookOpen },
     { id: 'search-agent', label: 'Data Scout', icon: Search },
     { id: 'response-agent', label: 'Insight Desk', icon: MessageSquare },
     { id: 'analytics-agent', label: 'Analytics', icon: BarChart3 },
-    { id: 'admin', label: 'Admin', icon: ShieldCheck },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'settings', label: 'Settings', icon: Settings }
   ];
+
+  const userNavItems = (isOrgAdmin || isCognivaAdmin) ? adminNavItems : employeeItems.filter(item => {
+    if (isEmployee && item.hideForEmployee) return false;
+    return true;
+  });
 
   const isAdminView = activeWorkspace === 'admin' || activeWorkspace === 'ai-orchestrator' || activeWorkspace === 'admin-orchestrator';
 
@@ -74,6 +101,18 @@ export default function Sidebar({ activeWorkspace, setActiveWorkspace }) {
         </div>
       </div>
 
+      <div className="p-4 border-t border-slate-200">
+        <button
+           onClick={() => {
+             localStorage.removeItem('cogniva_user');
+             window.location.reload();
+           }}
+           className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-600 hover:text-rose-600 font-bold rounded-xl text-xs transition-all cursor-pointer"
+        >
+           <LogOut className="w-4 h-4" />
+           <span>Sign Out</span>
+        </button>
+      </div>
     </aside>
   );
 }

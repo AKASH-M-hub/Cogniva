@@ -21,7 +21,8 @@ import {
   TrendingUp,
   BarChart2,
   DollarSign,
-  Sliders
+  Sliders,
+  TriangleAlert
 } from 'lucide-react';
 import { responseAgentAPI } from '../../services/api';
 
@@ -303,6 +304,7 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [attachedFile, setAttachedFile] = useState(null);
   const [scoreExplanationDoc, setScoreExplanationDoc] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState(null);
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -520,12 +522,23 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
     setShowHistoryModal(false);
   };
 
-  const handleDeleteSession = (sessionId, e) => {
+  const handleDeleteSession = (session, e) => {
     e.stopPropagation();
+    setDeleteDialog({
+      session,
+      title: 'Delete Chat Session',
+      message: `Are you sure you want to delete the chat session "${session.title || 'Unknown'}"? This cannot be undone.`
+    });
+  };
+
+  const confirmDeleteAction = () => {
+    if (!deleteDialog || !deleteDialog.session) return;
+    const sessionId = deleteDialog.session.id;
     setChatSessions((prev) => prev.filter((s) => s.id !== sessionId));
     if (activeSessionId === sessionId) {
       handleStartNewChat();
     }
+    setDeleteDialog(null);
   };
 
   const handleFileUpload = (e) => {
@@ -779,7 +792,7 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
                       </button>
 
                       <button
-                        onClick={(e) => handleDeleteSession(session.id, e)}
+                        onClick={(e) => handleDeleteSession(session, e)}
                         className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl transition-all cursor-pointer"
                         title="Delete chat session"
                       >
@@ -973,6 +986,39 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
           </div>
         );
       })()}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {deleteDialog && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn fade-in">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-md w-full shadow-2xl text-left transform scale-100 transition-all">
+            <div className="flex items-center space-x-4 mb-4">
+              <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                <TriangleAlert className="w-6 h-6 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">{deleteDialog.title}</h3>
+                <p className="text-sm text-slate-500 mt-1 leading-relaxed">{deleteDialog.message}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-end space-x-3 mt-8">
+              <button
+                onClick={() => setDeleteDialog(null)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteAction}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-sm shadow-md shadow-rose-600/20 transition-all cursor-pointer flex items-center space-x-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Yes, Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

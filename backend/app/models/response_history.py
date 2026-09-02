@@ -12,8 +12,6 @@ class ResponseHistory(Base):
     response = Column(Text, nullable=False)
     model = Column(String(100), default="Ollama Qwen 2.5 3B")
     response_time = Column(Float, default=0.0)
-    response_time_ms = Column(Float, default=0.0)
     confidence_score = Column(Float, default=98.5)
     grounded_status = Column(String(50), default="100% Grounded")
-    citations_count = Column(Integer, default=1)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

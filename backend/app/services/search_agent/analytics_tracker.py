@@ -26,11 +26,15 @@ def check_duplicate_document(filename: str, content: str) -> Tuple[bool, Optiona
     return False, None
 
 
+RECENT_GAPS_TRIGGERED = {}
+
 def log_search_execution(
     query: str,
     results_count: int,
     latency_ms: float,
-    user_department: Optional[str] = None
+    user_department: Optional[str] = None,
+    user_id: Optional[str] = None,
+    user_email: Optional[str] = None
 ) -> bool:
     SEARCH_ANALYTICS_LOG["total_queries"] += 1
     SEARCH_ANALYTICS_LOG["total_latency_ms"] += latency_ms
@@ -44,6 +48,30 @@ def log_search_execution(
             "timestamp": time.time(),
             "status": "unanswered_missing_knowledge"
         })
+        
+        # Remove time limits per user's request.
+        # To prevent the infinite loop, we simply ignore requests coming specifically from n8n.
+        if user_id != "n8n_automation":
+            def trigger_webhook():
+                try:
+                    import urllib.request
+                    import json
+                    req = urllib.request.Request(
+                        'http://127.0.0.1:5678/webhook/knowledge-gap',
+                        data=json.dumps({
+                            'user_id': user_id or 'System',
+                            'user_email': user_email or 'akashmohanraj333@gmail.com',
+                            'query': query,
+                            'department': user_department or 'General Enterprise'
+                        }).encode('utf-8'),
+                        headers={'Content-Type': 'application/json'}
+                    )
+                    urllib.request.urlopen(req, timeout=5)
+                except Exception as e:
+                    print(f"[AnalyticsTracker] Webhook trigger failed: {e}")
+            
+            import threading
+            threading.Thread(target=trigger_webhook, daemon=True).start()
 
     SEARCH_ANALYTICS_LOG["queries_history"].append({
         "query": query,

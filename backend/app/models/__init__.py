@@ -11,6 +11,7 @@ from app.models.analytics_agent import AnalyticsAgentLogModel, KnowledgeGapModel
 from app.models.document import Document, DocumentChunk
 from app.models.search_history import SearchHistory
 from app.models.response_history import ResponseHistory
+from app.models.memory import Memory
 
 __all__ = [
     "User",
@@ -25,5 +26,6 @@ __all__ = [
     "Document",
     "DocumentChunk",
     "SearchHistory",
-    "ResponseHistory"
+    "ResponseHistory",
+    "Memory"
 ]

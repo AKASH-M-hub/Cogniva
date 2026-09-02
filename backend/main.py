@@ -13,6 +13,9 @@ from app.api.decision import router as decision_router
 from app.api.search import router as search_router
 from app.api.orchestrator import router as orchestrator_router
 from app.api.analytics_agent_api import router as analytics_agent_router
+from app.api.analytics import router as general_analytics_router
+from app.api.notification import router as notification_router
+from app.api.admin import router as admin_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -48,7 +51,9 @@ app.include_router(decision_router)
 app.include_router(search_router)
 app.include_router(orchestrator_router)
 app.include_router(analytics_agent_router)
-
+app.include_router(general_analytics_router)
+app.include_router(notification_router)
+app.include_router(admin_router)
 
 @app.get("/")
 def home():

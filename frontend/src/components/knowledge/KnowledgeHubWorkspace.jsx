@@ -22,9 +22,13 @@ import {
   Sun,
   Sunset,
   Moon,
-  Trash2
+  Trash2,
+  Clock,
+  Timer,
+  Info,
+  TriangleAlert
 } from 'lucide-react';
-import { knowledgeHubAPI } from '../../services/api';
+import { knowledgeHubAPI, adminAPI } from '../../services/api';
 
 const getTimeSegment = (timestampStr) => {
   if (!timestampStr) return 'Afternoon / Noon (12:00 PM - 05:00 PM)';
@@ -41,6 +45,7 @@ const getTimeSegment = (timestampStr) => {
 export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSearch, onNavigateToResponse }) {
   // Navigation tab state: 'records', 'add', or 'chroma'
   const [activeTab, setActiveTab] = useState('records');
+  const [isChromaUnlocked, setIsChromaUnlocked] = useState(false);
 
   // Records Section State & Filters
   const [recordSearch, setRecordSearch] = useState('');
@@ -56,9 +61,11 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
   const [reason, setReason] = useState('');
   const [priority, setPriority] = useState('High');
   const [tags, setTags] = useState([]);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
 
   const [loading, setLoading] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [timelineStep, setTimelineStep] = useState(0);
   const [successMessage, setSuccessMessage] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
 
@@ -77,13 +84,46 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
   const [expandedDates, setExpandedDates] = useState({});
   const toggleDate = (dateKey) => setExpandedDates((prev) => ({ ...prev, [dateKey]: !prev[dateKey] }));
 
+  const [expandedDocuments, setExpandedDocuments] = useState({});
+  const toggleDocument = (docKey) => setExpandedDocuments((prev) => ({ ...prev, [docKey]: !prev[docKey] }));
+
   // View Online PDF Modal
   const [viewPdfModalDoc, setViewPdfModalDoc] = useState(null);
+
+  // Chroma Info Modal State
+  const [showChromaInfo, setShowChromaInfo] = useState(false);
+
+  // Delete Confirmation Modal State
+  const [deleteDialog, setDeleteDialog] = useState(null);
+
+  // Custom Unlock Modal State
+  const [unlockStep, setUnlockStep] = useState(null); // 'confirm', 'password', or null
+  const [unlockPassword, setUnlockPassword] = useState('');
+  const [unlockError, setUnlockError] = useState('');
 
   useEffect(() => {
     fetchHistory();
     fetchChromaHistory();
   }, []);
+
+  useEffect(() => {
+    let interval;
+    if (loading) {
+      setElapsedTime(0);
+      setTimelineStep(1);
+      interval = setInterval(() => {
+        setElapsedTime((prev) => {
+          const newTime = prev + 0.1;
+          if (newTime > 1.5 && newTime < 3) setTimelineStep(2);
+          if (newTime >= 3) setTimelineStep(3);
+          return newTime;
+        });
+      }, 100);
+    } else {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const fetchHistory = async () => {
     setHistoryLoading(true);
@@ -114,53 +154,98 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
     }
   };
 
-  const handleDeleteRecord = async (item, isVectorStore = false) => {
-    const itemName = item.name || item.filename || item.id;
-    if (!window.confirm(`Are you sure you want to delete ${isVectorStore ? 'this vector chunk' : 'this document record'} (${itemName})?`)) return;
+  const handleUnlockChroma = () => {
+    setUnlockStep('confirm');
+    setUnlockPassword('');
+    setUnlockError('');
+  };
 
+  const submitUnlockPassword = async (e) => {
+    e?.preventDefault();
     try {
-      if (isVectorStore) {
-        await knowledgeHubAPI.deleteChromaVector(item.id);
-        setChromaItems((prev) => prev.filter((chunk) => chunk.id !== item.id));
-        setTotalVectors((prev) => Math.max(0, prev - 1));
+      const res = await adminAPI.getVectorPassword();
+      if (unlockPassword === res.password) {
+        setIsChromaUnlocked(true);
+        setActiveTab('chroma');
+        setUnlockStep(null);
       } else {
-        const recordId = item.id || item.name || item.filename;
-        await knowledgeHubAPI.deleteRecord(recordId);
-        setHistoryList((prev) => prev.filter((rec) => (rec.id !== item.id && rec.name !== item.name)));
-        fetchChromaHistory();
+        setUnlockError('Incorrect password. Please try again.');
       }
-    } catch (err) {
-      console.error('Delete record error:', err);
+    } catch {
+      setUnlockError('Server error checking password.');
     }
   };
 
-  const handleClearAll = async () => {
-    if (window.confirm('Are you sure you want to delete all uploaded files, ChromaDB vectors, and PostgreSQL records? This action cannot be undone.')) {
-      try {
+  const handleSyncAll = async () => {
+    await Promise.all([fetchHistory(), fetchChromaHistory()]);
+  };
+
+  const handleDeleteRecord = (item, isVectorStore = false) => {
+    const itemName = item.name || item.filename || item.id;
+    setDeleteDialog({
+      action: 'record',
+      item,
+      isVectorStore,
+      title: 'Confirm Deletion',
+      message: `Are you sure you want to delete ${isVectorStore ? 'this vector chunk' : 'this document record'} (${itemName})? This cannot be undone.`
+    });
+  };
+
+  const handleClearAll = () => {
+    setDeleteDialog({
+      action: 'clearAll',
+      title: 'Wipe All Data',
+      message: 'Are you sure you want to delete all uploaded files, ChromaDB vectors, and PostgreSQL records? This action cannot be undone.'
+    });
+  };
+
+  const confirmDeleteAction = async () => {
+    if (!deleteDialog) return;
+    const { action, item, isVectorStore } = deleteDialog;
+
+    try {
+      if (action === 'clearAll') {
         await knowledgeHubAPI.clearAllData();
         await fetchHistory();
         await fetchChromaHistory();
-      } catch (err) {
-        console.error('Failed to clear data:', err);
+      } else if (action === 'record') {
+        if (isVectorStore) {
+          await knowledgeHubAPI.deleteChromaVector(item.id);
+          setChromaItems((prev) => prev.filter((chunk) => chunk.id !== item.id));
+          setTotalVectors((prev) => Math.max(0, prev - 1));
+        } else {
+          const recordId = item.id || item.name || item.filename;
+          await knowledgeHubAPI.deleteRecord(recordId);
+          setHistoryList((prev) => prev.filter((rec) => (rec.id !== item.id && rec.name !== item.name)));
+          fetchChromaHistory();
+        }
       }
+    } catch (err) {
+      console.error('Delete action error:', err);
+    } finally {
+      setDeleteDialog(null);
     }
   };
 
   const handleViewOnline = (item) => {
-    setViewPdfModalDoc(item);
+    const fileName = item.name || item.filename;
+    if (fileName) {
+      window.open(`http://localhost:8000/upload/file/${fileName}`, '_blank');
+    }
   };
 
   const handleDownloadFile = (item) => {
-    const fileName = item.name || 'document';
-    const content = `COGNIVA ENTERPRISE RECORD\nTITLE: ${item.title || fileName}\nCATEGORY: ${item.category || 'General'}\nDEPARTMENT: ${item.department || 'General'}\nDATE: ${item.timestamp || ''}\n\nCONTENT / DESCRIPTION:\n${item.description || item.reason || 'Physical file record payload.'}`;
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName.includes('.') ? fileName : `${fileName}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const fileName = item.name || item.filename;
+    if (fileName) {
+      // By using a direct anchor string instead of fetch(), we completely bypass cross-origin JS restrictions.
+      // And the backend's ?download=true will force standard FileResponse headers.
+      const link = document.createElement('a');
+      link.href = `http://localhost:8000/upload/file/${fileName}?download=true`;
+      link.download = fileName; // Enforce download behavior
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   const handleDownloadChunk = (item) => {
@@ -177,15 +262,24 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
   };
 
   const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files);
+      setSelectedFiles(prev => {
+        const combined = [...prev];
+        newFiles.forEach(file => {
+           if (!combined.some(f => f.name === file.name)) {
+               combined.push(file);
+           }
+        });
+        return combined;
+      });
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title.trim() && !selectedFile) {
-      setErrorMessage('Please provide a Knowledge Title or attach a document to upload.');
+    if (!title.trim() && selectedFiles.length === 0) {
+      setErrorMessage('Please provide a Knowledge Title or attach documents to upload.');
       return;
     }
 
@@ -197,10 +291,11 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
     const finalCat = categorySelect === 'Custom' ? customCategory || 'General' : categorySelect;
 
     try {
-      if (selectedFile) {
-        await knowledgeHubAPI.uploadDocument(selectedFile);
+      if (selectedFiles.length > 0) {
+        // Upload all selected files in parallel
+        await Promise.all(selectedFiles.map(file => knowledgeHubAPI.uploadDocument(file)));
       } else {
-        await knowledgeHubAPI.addTextKnowledge({
+        await knowledgeHubAPI.addKnowledgeText({
           title,
           description,
           department: finalDept,
@@ -212,8 +307,8 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
       }
 
       setSuccessMessage(
-        selectedFile
-          ? `Document "${selectedFile.name}" successfully uploaded & vector indexed into ChromaDB!`
+        selectedFiles.length > 0
+          ? `${selectedFiles.length} Document(s) successfully uploaded & vector indexed into ChromaDB!`
           : `Knowledge record "${title}" successfully indexed into ChromaDB & PostgreSQL!`
       );
 
@@ -221,15 +316,19 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
       setDescription('');
       setReason('');
       setTags([]);
-      setSelectedFile(null);
+      setSelectedFiles([]);
       setCustomDepartment('');
       setCustomCategory('');
 
-      fetchHistory();
-      fetchChromaHistory();
+      // Add a small delay to ensure backend vector DB fully flushed its index
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      await fetchHistory();
+      await fetchChromaHistory();
     } catch (err) {
       console.error('Error saving knowledge entry:', err);
-      setErrorMessage(err.message || 'Failed to index knowledge. Please try again.');
+      const apiDetail = err.response?.data?.detail;
+      setErrorMessage(apiDetail || err.message || 'Failed to index knowledge. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -349,13 +448,15 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
                   </td>
                   <td className="py-3.5 px-4 text-right">
                     <div className="flex justify-end items-center space-x-2">
-                      <button
-                        onClick={() => setSelectedHistoryDoc(item)}
-                        className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-semibold transition-all cursor-pointer inline-flex items-center space-x-1"
-                      >
-                        <Eye className="w-3.5 h-3.5 text-slate-600" />
-                        <span>{isVectorStore ? 'Inspect Chunk Payload' : 'Inspect'}</span>
-                      </button>
+                      {isVectorStore && (
+                        <button
+                          onClick={() => setSelectedHistoryDoc(item)}
+                          className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-semibold transition-all cursor-pointer inline-flex items-center space-x-1"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-slate-600" />
+                          <span>Inspect Chunk Payload</span>
+                        </button>
+                      )}
 
                       {!isVectorStore && (
                         <button
@@ -425,10 +526,7 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
         {/* 3 Integrated Navigation Tab Buttons */}
         <div className="flex items-center space-x-2 bg-white/15 backdrop-blur-md p-1.5 rounded-xl border border-white/20 relative z-10 self-start xl:self-auto shrink-0">
           <button
-            onClick={() => {
-              setActiveTab('records');
-              fetchHistory();
-            }}
+            onClick={() => setActiveTab('records')}
             className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center space-x-2 cursor-pointer ${activeTab === 'records'
               ? 'bg-white text-indigo-600 shadow-md font-extrabold'
               : 'text-white hover:bg-white/15'
@@ -449,21 +547,92 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
             <span>Add Knowledge</span>
           </button>
 
-          <button
-            onClick={() => {
-              setActiveTab('chroma');
-              fetchChromaHistory();
-            }}
-            className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center space-x-2 cursor-pointer ${activeTab === 'chroma'
-              ? 'bg-white text-indigo-600 shadow-md font-extrabold'
-              : 'text-white hover:bg-white/15'
-              }`}
-          >
-            <Zap className="w-4 h-4" />
-            <span>ChromaDB Vectors</span>
-          </button>
+          {!isChromaUnlocked ? (
+            <button
+              onClick={handleUnlockChroma}
+              className="px-4 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer text-white hover:bg-white/15"
+              title="Unlock ChromaDB Vectors"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+          ) : (
+            <button
+              onClick={() => setActiveTab('chroma')}
+              className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center space-x-2 cursor-pointer ${activeTab === 'chroma'
+                ? 'bg-white text-indigo-600 shadow-md font-extrabold'
+                : 'text-white hover:bg-white/15'
+                }`}
+            >
+              <Zap className="w-4 h-4" />
+              <span>ChromaDB Vectors</span>
+            </button>
+          )}
         </div>
       </div>
+
+      {/* TIMELINE PROGRESS INDICATOR */}
+      {(loading || (successMessage && elapsedTime > 0)) && activeTab === 'add' && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs animate-fadeIn">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
+              <Clock className="w-4.5 h-4.5 text-indigo-500" />
+              <span>Processing Timeline</span>
+            </h3>
+            <span className="bg-indigo-50 text-indigo-700 px-3.5 py-1.5 rounded-lg text-xs font-bold font-mono border border-indigo-100 shadow-inner flex items-center space-x-2">
+              <Timer className="w-3.5 h-3.5" />
+              <span>{elapsedTime.toFixed(1)}s elapsed</span>
+            </span>
+          </div>
+
+          <div className="relative mt-6 px-4">
+            {/* Timeline line */}
+            <div className="absolute top-5 left-[10%] right-[10%] h-0.5 bg-slate-100 rounded-full hidden sm:block"></div>
+
+            <div className="relative z-10 flex flex-col sm:flex-row justify-between space-y-4 sm:space-y-0 text-xs font-semibold">
+              <div className="flex flex-col items-center flex-1 bg-white pt-1">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 mb-2.5 transition-all duration-300 ${timelineStep >= 1 ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200/50' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+                  {timelineStep > 1 || !loading ? <CheckCircle2 className="w-5 h-5" /> : <RefreshCw className="w-5 h-5 animate-spin" />}
+                </div>
+                <span className={timelineStep >= 1 ? 'text-indigo-900 font-bold' : 'text-slate-400'}>Initialize Request</span>
+              </div>
+
+              <div className="flex flex-col items-center flex-1 bg-white pt-1">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 mb-2.5 transition-all duration-300 ${timelineStep >= 2 ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200/50' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+                  {timelineStep > 2 || !loading ? <CheckCircle2 className="w-5 h-5" /> : (timelineStep === 2 ? <RefreshCw className="w-5 h-5 animate-spin" /> : <div className="w-2.5 h-2.5 rounded-full bg-slate-300" />)}
+                </div>
+                <span className={timelineStep >= 2 ? 'text-indigo-900 font-bold' : 'text-slate-400'}>Upload Document</span>
+              </div>
+
+              <div className="flex flex-col items-center flex-1 bg-white pt-1">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 mb-2.5 transition-all duration-300 ${!loading && successMessage ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200/50' : (timelineStep >= 3 ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200/50' : 'bg-slate-50 border-slate-200 text-slate-400')}`}>
+                  {!loading && successMessage ? <CheckCircle2 className="w-5 h-5" /> : (timelineStep === 3 ? <RefreshCw className="w-5 h-5 animate-spin" /> : <div className="w-2.5 h-2.5 rounded-full bg-slate-300" />)}
+                </div>
+                <span className={!loading && successMessage ? 'text-emerald-700 font-bold' : (timelineStep >= 3 ? 'text-indigo-900 font-bold' : 'text-slate-400')}>Vector Indexing</span>
+              </div>
+            </div>
+
+            {/* Horizontal Progress Bar Below Timeline */}
+            <div className="mt-8 px-2">
+              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden shadow-inner">
+                <div
+                  className={`h-full rounded-full transition-all duration-[400ms] ease-out ${!loading && successMessage ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]'}`}
+                  style={{
+                    width: !loading && successMessage
+                      ? '100%'
+                      : (loading ? `${Math.min(95, 10 + (elapsedTime * 15))}%` : '0%')
+                  }}
+                >
+                </div>
+              </div>
+              <div className="mt-2 text-right">
+                <span className={`text-[10px] font-extrabold uppercase tracking-wider ${!loading && successMessage ? 'text-emerald-600' : 'text-indigo-500 animate-pulse'}`}>
+                  {!loading && successMessage ? 'Process Complete - 100%' : 'Processing...'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SUCCESS / ERROR ALERTS */}
       {successMessage && (
@@ -490,10 +659,11 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
         </div>
       )}
 
+      {/* TAB PROGRESS/ALERTS ARE OUTSIDE TABS TO PERSIST GLOBALLY */}
       {/* TAB 1: RECORDS SECTION */}
       {activeTab === 'records' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-indigo-600 border border-indigo-500/40 rounded-2xl p-4.5 shadow-md text-white">
               <div className="flex items-center justify-between text-indigo-100">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-200">INDEXED DOCUMENTS</span>
@@ -524,24 +694,11 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
                 </div>
               </div>
               <div className="mt-2.5 text-2xl font-extrabold text-white">
-                {new Set(filteredFileRecords.map((h) => h.department).filter(Boolean)).size || 5}
+                {new Set(filteredFileRecords.map((h) => h.department).filter(Boolean)).size || 0}
               </div>
               <p className="text-[11px] text-indigo-200/80 mt-0.5 font-medium">Active Organizational Units</p>
             </div>
 
-            <div className="bg-indigo-600 border border-indigo-500/40 rounded-2xl p-4.5 shadow-md text-white">
-              <div className="flex items-center justify-between text-indigo-100">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-200">VECTOR ENGINE</span>
-                <div className="w-8 h-8 rounded-xl bg-white/20 text-white flex items-center justify-center border border-white/20">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="mt-2.5 text-base font-bold text-white flex items-center space-x-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Operational</span>
-              </div>
-              <p className="text-[11px] text-indigo-200/80 mt-0.5 font-medium">384-d Cosine Metric Ready</p>
-            </div>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -562,21 +719,13 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
 
             <div className="flex items-center space-x-2">
               <button
-                onClick={fetchHistory}
+                onClick={handleSyncAll}
                 className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-all flex items-center space-x-1.5 cursor-pointer"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${historyLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 ${historyLoading || chromaLoading ? 'animate-spin' : ''}`} />
                 <span>Sync Records</span>
               </button>
 
-              <button
-                onClick={handleClearAll}
-                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-semibold rounded-xl text-xs transition-all flex items-center space-x-1.5 cursor-pointer"
-                title="Wipe all uploaded physical files, ChromaDB vectors, and PostgreSQL records"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                <span>Clear All Data</span>
-              </button>
 
               <button
                 onClick={() => setActiveTab('add')}
@@ -621,9 +770,13 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
           {sortedRecordDates.length > 0 ? (
             sortedRecordDates.map((dateStr, idx) => {
               const timeSegments = groupedRecordsByDateAndTime[dateStr];
-              const segmentKeys = Object.keys(timeSegments);
+              const segmentKeys = Object.keys(timeSegments).sort((a, b) => {
+                const order = { 'Morning': 1, 'Afternoon': 2, 'Evening': 3 };
+                const getOrder = (s) => order[Object.keys(order).find(k => s.includes(k))] || 4;
+                return getOrder(a) - getOrder(b);
+              });
               const totalDocsInDate = segmentKeys.reduce((acc, seg) => acc + (timeSegments[seg]?.length || 0), 0);
-              const isExpanded = expandedDates[dateStr] !== undefined ? Boolean(expandedDates[dateStr]) : (idx === 0);
+              const isExpanded = expandedDates[dateStr] !== undefined ? Boolean(expandedDates[dateStr]) : false;
 
               return (
                 <div key={dateStr} className="bg-white border border-slate-200 hover:border-indigo-200 rounded-2xl shadow-xs overflow-hidden transition-all">
@@ -823,6 +976,7 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
                   type="file"
                   onChange={handleFileChange}
                   accept=".pdf,.docx,.ppt,.pptx,.txt"
+                  multiple
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
                 <div className="flex flex-col items-center justify-center space-y-2">
@@ -830,13 +984,18 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
                     <UploadCloud className="w-6 h-6" />
                   </div>
                   <div className="text-sm font-semibold text-slate-800">
-                    {selectedFile ? (
-                      <span className="text-indigo-600 font-bold flex items-center space-x-1">
-                        <FileText className="w-4 h-4" />
-                        <span>Attached: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)</span>
-                      </span>
+                    {selectedFiles.length > 0 ? (
+                      <div className="flex flex-col items-center space-y-1">
+                        <span className="text-indigo-600 font-bold flex items-center space-x-1">
+                          <FileText className="w-4 h-4" />
+                          <span>Attached: {selectedFiles.length} file(s)</span>
+                        </span>
+                        <span className="text-xs text-indigo-500 font-medium max-w-[250px] truncate block text-center">
+                          {selectedFiles.map(f => f.name).join(', ')}
+                        </span>
+                      </div>
                     ) : (
-                      <span>Upload File - Drag and drop files here or click to browse</span>
+                      <span>Upload Files - Drag and drop multiple files here or click to browse</span>
                     )}
                   </div>
                   <p className="text-xs text-slate-400">Supports PDF, DOCX, PPTX, TXT (Max 20MB)</p>
@@ -870,94 +1029,54 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
       {/* TAB 3: CHROMADB VECTOR STORE */}
       {activeTab === 'chroma' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-indigo-600 border border-indigo-500/40 rounded-2xl p-4.5 shadow-md text-white">
-              <div className="flex items-center justify-between text-indigo-100">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-200">TOTAL VECTOR CHUNKS</span>
-                <div className="w-8 h-8 rounded-xl bg-white/20 text-white flex items-center justify-center border border-white/20">
-                  <Zap className="w-4 h-4" />
-                </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+            <div className="flex flex-row items-center space-x-4 flex-1 min-w-0">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center shadow-xs shrink-0">
+                <Zap className="w-6 h-6" />
               </div>
-              <div className="mt-2.5 text-2xl font-extrabold text-white">{totalVectors} Chunks</div>
-              <p className="text-[11px] text-indigo-200/80 mt-0.5 font-medium">Payload Chunks in Vector Store</p>
-            </div>
-
-            <div className="bg-indigo-600 border border-indigo-500/40 rounded-2xl p-4.5 shadow-md text-white">
-              <div className="flex items-center justify-between text-indigo-100">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-200">VECTOR DIMENSIONS</span>
-                <div className="w-8 h-8 rounded-xl bg-white/20 text-white flex items-center justify-center border border-white/20">
-                  <Layers className="w-4 h-4" />
+              <div className="flex flex-col flex-1 min-w-0">
+                <div className="flex flex-wrap flex-col sm:flex-row sm:items-center gap-2 mb-0.5">
+                  <h2 className="text-xl font-extrabold text-slate-900 tracking-tight whitespace-nowrap">ChromaDB Vector Store</h2>
                 </div>
-              </div>
-              <div className="mt-2.5 text-2xl font-extrabold text-white">384-d</div>
-              <p className="text-[11px] text-indigo-200/80 mt-0.5 font-medium">Dense Float32 Embedding Space</p>
-            </div>
-
-            <div className="bg-indigo-600 border border-indigo-500/40 rounded-2xl p-4.5 shadow-md text-white">
-              <div className="flex items-center justify-between text-indigo-100">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-200">EMBEDDING MODEL</span>
-                <div className="w-8 h-8 rounded-xl bg-white/20 text-white flex items-center justify-center border border-white/20">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="mt-2.5 text-base font-bold text-white">all-MiniLM-L6-v2</div>
-              <p className="text-[11px] text-indigo-200/80 mt-0.5 font-medium">SentenceTransformer Engine</p>
-            </div>
-
-            <div className="bg-indigo-600 border border-indigo-500/40 rounded-2xl p-4.5 shadow-md text-white">
-              <div className="flex items-center justify-between text-indigo-100">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-200">DISTANCE METRIC</span>
-                <div className="w-8 h-8 rounded-xl bg-white/20 text-white flex items-center justify-center border border-white/20">
-                  <Database className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="mt-2.5 text-base font-bold text-white">Cosine Similarity</div>
-              <p className="text-[11px] text-indigo-200/80 mt-0.5 font-medium">High-Precision Indexing</p>
-            </div>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center space-x-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center shadow-xs">
-                <Zap className="w-5.5 h-5.5" />
-              </div>
-              <div>
-                <div className="flex items-center space-x-2">
-                  <h2 className="text-lg font-bold text-slate-900">ChromaDB Vector Store</h2>
-                  <span className="px-2.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700 text-[10px] font-extrabold uppercase tracking-wider">
-                    Dense Semantic Embeddings
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">
-                  Inspect dense 384-dimensional vector payload chunks indexed with filename metadata and timestamp separation.
+                <p className="text-xs text-slate-500 font-medium">
+                  Inspect your vectorized data chunks
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={fetchChromaHistory}
-                disabled={chromaLoading}
-                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${chromaLoading ? 'animate-spin' : ''}`} />
-                <span>Re-Scan Vectors</span>
-              </button>
+            <div className="flex flex-wrap flex-col sm:flex-row sm:items-center gap-2 xl:shrink-0 w-full xl:w-auto mt-2 xl:mt-0">
+              <div className="flex items-center space-x-2 w-full sm:w-auto">
+                <button
+                  onClick={() => setShowChromaInfo(true)}
+                  className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-indigo-600 rounded-xl transition-all flex items-center justify-center cursor-pointer border border-slate-200 shrink-0"
+                  title="View ChromaDB Vectors Configuration Details"
+                >
+                  <Info className="w-4 h-4" />
+                </button>
 
-              <button
-                onClick={handleClearAll}
-                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-semibold rounded-xl text-xs transition-all flex items-center space-x-1.5 cursor-pointer"
-                title="Wipe all uploaded physical files, ChromaDB vectors, and PostgreSQL records"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                <span>Clear All Data</span>
-              </button>
+                <button
+                  onClick={handleSyncAll}
+                  disabled={chromaLoading || historyLoading}
+                  className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50 border border-slate-200"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${chromaLoading || historyLoading ? 'animate-spin' : ''}`} />
+                  <span>Re-Scan Vectors</span>
+                </button>
 
+                <button
+                  onClick={handleClearAll}
+                  className="flex-1 sm:flex-none px-4 py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-semibold rounded-xl text-xs transition-all flex items-center justify-center space-x-2 cursor-pointer"
+                  title="Wipe all uploaded physical files, ChromaDB vectors, and PostgreSQL records"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Clear All Data</span>
+                </button>
+              </div>
               <button
                 onClick={() => setActiveTab('add')}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center space-x-2 cursor-pointer"
               >
-                <PlusCircle className="w-3.5 h-3.5" />
+                <PlusCircle className="w-4 h-4" />
                 <span>Add Vector Knowledge</span>
               </button>
             </div>
@@ -996,9 +1115,13 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
           {sortedChromaDates.length > 0 ? (
             sortedChromaDates.map((dateStr, idx) => {
               const timeSegments = groupedChromaByDateAndTime[dateStr];
-              const segmentKeys = Object.keys(timeSegments);
+              const segmentKeys = Object.keys(timeSegments).sort((a, b) => {
+                const order = { 'Morning': 1, 'Afternoon': 2, 'Evening': 3 };
+                const getOrder = (s) => order[Object.keys(order).find(k => s.includes(k))] || 4;
+                return getOrder(a) - getOrder(b);
+              });
               const totalChunksInDate = segmentKeys.reduce((acc, seg) => acc + (timeSegments[seg]?.length || 0), 0);
-              const isExpanded = expandedDates[`chroma_${dateStr}`] !== undefined ? Boolean(expandedDates[`chroma_${dateStr}`]) : (idx === 0);
+              const isExpanded = expandedDates[`chroma_${dateStr}`] !== undefined ? Boolean(expandedDates[`chroma_${dateStr}`]) : false;
 
               return (
                 <div key={dateStr} className="bg-white border border-slate-200 hover:border-indigo-200 rounded-2xl shadow-xs overflow-hidden transition-all">
@@ -1048,7 +1171,53 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
                               )}
                               <span className="uppercase tracking-wider font-extrabold">{segmentName}</span>
                             </div>
-                            {renderRecordsTable(chunks, true)}
+
+                            {(() => {
+                              // Group chunks by doc title/filename
+                              const docGroups = chunks.reduce((acc, chunk) => {
+                                const fname = chunk.filename || chunk.name || 'Unknown Document';
+                                if (!acc[fname]) acc[fname] = [];
+                                acc[fname].push(chunk);
+                                return acc;
+                              }, {});
+
+                              return Object.keys(docGroups).map((docName) => {
+                                const docChunks = docGroups[docName];
+                                const docKey = `${dateStr}_${segmentName}_${docName}`;
+                                const isDocExpanded = expandedDocuments[docKey];
+
+                                return (
+                                  <div key={docKey} className="bg-white border border-slate-200 rounded-xl overflow-hidden mt-2 mb-2 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                                    <div
+                                      onClick={() => toggleDocument(docKey)}
+                                      className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-50 transition-colors select-none"
+                                    >
+                                      <div className="flex items-center space-x-3">
+                                        <div className="w-8 h-8 rounded-lg bg-indigo-50/50 text-indigo-600 flex items-center justify-center border border-indigo-100/50">
+                                          <FileText className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                          <h4 className="text-sm font-bold text-slate-800">{docName}</h4>
+                                          <div className="flex items-center space-x-2 mt-0.5">
+                                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md uppercase tracking-wider">{docChunks.length} {docChunks.length === 1 ? 'Chunk' : 'Chunks'}</span>
+                                            <span className="text-[10px] text-slate-400 font-medium">Click to {isDocExpanded ? 'hide' : 'view'} chunks</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className={`p-1.5 rounded-lg bg-slate-100 text-slate-600 transition-transform duration-200 ${isDocExpanded ? 'rotate-180 bg-indigo-50 text-indigo-600' : ''}`}>
+                                        <ChevronDown className="w-4 h-4" />
+                                      </div>
+                                    </div>
+
+                                    {isDocExpanded && (
+                                      <div className="border-t border-slate-100 p-0 bg-slate-50/30">
+                                        {renderRecordsTable(docChunks, true)}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              });
+                            })()}
                           </div>
                         );
                       })}
@@ -1186,6 +1355,169 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* CHROMA INFO MODAL */}
+      {showChromaInfo && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn fade-in">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-xl text-left">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                  <Database className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900">
+                    ChromaDB Configuration
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowChromaInfo(false)}
+                className="text-slate-400 hover:text-slate-700 font-bold p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 pt-2">
+              <div className="flex justify-between items-center border-b border-slate-50 pb-3">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Linked Vectors</span>
+                <span className="font-extrabold text-indigo-600 text-sm bg-indigo-50 px-2 py-0.5 rounded-md">{totalVectors} Chunks</span>
+              </div>
+
+              <div className="flex justify-between items-center border-b border-slate-50 pb-3">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Embedding Model</span>
+                <span className="font-bold text-slate-800 text-sm px-2 py-0.5 bg-slate-100 rounded-md">all-MiniLM-L6-v2</span>
+              </div>
+              <div className="flex justify-between items-center pb-1">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Distance Metric</span>
+                <span className="font-bold text-slate-800 text-sm">Cosine Similarity</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* UNLOCK CHROMA VECTOR MODAL */}
+      {unlockStep && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-sm w-full shadow-2xl text-left transform scale-100 transition-all">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-4 mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {unlockStep === 'confirm' ? 'Restricted Area' : 'Authentication Required'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {unlockStep === 'confirm' ? 'Enterprise Vectors' : 'Enter Admin Password'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setUnlockStep(null)}
+                className="text-slate-400 hover:text-slate-700 font-bold p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {unlockStep === 'confirm' && (
+              <div className="space-y-6">
+                <p className="text-sm text-slate-700 font-medium leading-relaxed">
+                  Do you want to see the advanced ChromaDB vector chunking datasets? It is not allowed for employeers!
+                </p>
+                <div className="flex items-center justify-end space-x-3">
+                  <button
+                    onClick={() => setUnlockStep(null)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => setUnlockStep('password')}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+                  >
+                    Proceed
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {unlockStep === 'password' && (
+              <form onSubmit={submitUnlockPassword} className="space-y-5">
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Admin Password
+                  </label>
+                  <input
+                    type="password"
+                    autoFocus
+                    value={unlockPassword}
+                    onChange={(e) => {
+                      setUnlockPassword(e.target.value);
+                      if (unlockError) setUnlockError('');
+                    }}
+                    placeholder="Enter password..."
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-sans"
+                  />
+                  {unlockError && <p className="text-[11px] font-bold text-rose-500 mt-1">{unlockError}</p>}
+                </div>
+
+                <div className="flex items-center justify-end space-x-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setUnlockStep(null)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+                  >
+                    Unlock Access
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {deleteDialog && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-md w-full shadow-2xl text-left transform scale-100 transition-all">
+            <div className="flex items-center space-x-4 mb-4">
+              <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                <TriangleAlert className="w-6 h-6 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">{deleteDialog.title}</h3>
+                <p className="text-sm text-slate-500 mt-1 leading-relaxed">{deleteDialog.message}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 mt-8">
+              <button
+                onClick={() => setDeleteDialog(null)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteAction}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-sm shadow-md shadow-rose-600/20 transition-all cursor-pointer flex items-center space-x-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Yes, Delete</span>
+              </button>
             </div>
           </div>
         </div>

@@ -72,6 +72,7 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
 
   // Search History State
   const [searchHistory, setSearchHistory] = useState([]);
+  const [totalHistoryCount, setTotalHistoryCount] = useState(0);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   // Modals for inspecting source documents, chunks, and relevance score explanation
@@ -92,6 +93,7 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
       const res = await searchAgentAPI.getHistory();
       if (res && res.history) {
         setSearchHistory(res.history);
+        setTotalHistoryCount(res.total_count !== undefined ? res.total_count : res.history.length);
       }
     } catch (err) {
       console.error('Failed to fetch search history:', err);
@@ -123,9 +125,11 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
       if (deleteDialog.action === 'clearAll') {
         await searchAgentAPI.clearHistory();
         setSearchHistory([]);
+        setTotalHistoryCount(0);
       } else if (deleteDialog.action === 'single') {
         await searchAgentAPI.deleteHistoryItem(deleteDialog.historyId);
         setSearchHistory((prev) => prev.filter((item) => item.id !== deleteDialog.historyId));
+        setTotalHistoryCount((prev) => Math.max(0, prev - 1));
       }
     } catch (err) {
       console.error('Delete action failed:', err);
@@ -270,7 +274,7 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
             }`}
         >
           <History className="w-4 h-4" />
-          <span>Search History ({searchHistory.length})</span>
+          <span>Search History ({totalHistoryCount || searchHistory.length})</span>
         </button>
       </div>
 

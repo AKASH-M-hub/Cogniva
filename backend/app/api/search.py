@@ -144,6 +144,7 @@ def get_search_history(
     """
     try:
         from app.models.search_history import SearchHistory
+        total_count = db.query(SearchHistory).count()
         records = db.query(SearchHistory).order_by(SearchHistory.search_time.desc()).limit(limit).all()
         history = []
         for r in records:
@@ -157,7 +158,7 @@ def get_search_history(
                 "department": r.department or "General",
                 "search_mode": r.search_mode or "Semantic Vector Search"
             })
-        return {"success": True, "history": history}
+        return {"success": True, "history": history, "total_count": total_count}
     except Exception as e:
         print(f"Error fetching search history: {e}")
         return {"success": False, "history": []}

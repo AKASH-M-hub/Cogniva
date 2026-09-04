@@ -51,7 +51,7 @@ _model_instance = None
 def get_model():
     global _model_instance
     if _model_instance is None:
-        _model_instance = SentenceTransformer("all-MiniLM-L6-v2")
+        _model_instance = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
     return _model_instance
 
 

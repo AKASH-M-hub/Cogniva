@@ -75,7 +75,11 @@ export default function AuthPages({ onLoginSuccess, onBackToSaaS }) {
         setError(res.data.message || 'Invalid credentials');
       }
     } catch (err) {
-      setError('Server connection error. Ensure backend is running.');
+      if (err.response?.data?.detail) {
+        setError(err.response.data.detail);
+      } else {
+        setError(err.response?.data?.message || 'Server connection error. Ensure backend is running.');
+      }
     }
     setLoading(false);
   };
@@ -111,7 +115,11 @@ export default function AuthPages({ onLoginSuccess, onBackToSaaS }) {
         setError(res.data.message || 'Failed to register');
       }
     } catch (err) {
-       setError('Registration error. Email might be in use.');
+       if (err.response?.data?.detail) {
+         setError(err.response.data.detail);
+       } else {
+         setError(err.response?.data?.message || 'Registration error. Email might be in use.');
+       }
     }
     setLoading(false);
   };

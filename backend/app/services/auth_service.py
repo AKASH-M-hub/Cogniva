@@ -73,16 +73,15 @@ def register_org_employee(db: Session, req: EmployeeRegisterRequest):
     print(f"[MAILING SYSTEM] Sent credentials to {req.email}. Password: {req.password}")
     return {"success": True, "message": f"Employee created and credentials emailed to {req.email} successfully"}
 
+from fastapi import HTTPException
+
 def login_user(db: Session, login: LoginRequest):
     """
     Login existing user
     """
     user = db.query(User).filter(User.email == login.email).first()
-    if user is None:
-        return {"success": False, "message": "User not found"}
-
-    if not verify_password(login.password, user.password):
-        return {"success": False, "message": "Invalid Password"}
+    if not user or not verify_password(login.password, user.password):
+        raise HTTPException(status_code=401, detail="Invalid email or password. Please try again.")
 
     return {
         "success": True,

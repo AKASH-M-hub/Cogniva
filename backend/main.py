@@ -73,7 +73,7 @@ app.include_router(general_analytics_router)
 app.include_router(notification_router)
 app.include_router(admin_router)
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def home():
     return {
         "message": "Welcome to Cogniva Enterprise AI 🚀"

@@ -11,42 +11,15 @@ def update_db():
     
     with engine.begin() as conn:
         try:
-            conn.execute(text("ALTER TABLE users ADD COLUMN user_type VARCHAR(50) DEFAULT 'employee'"))
-            logger.info("Added user_type column.")
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS user_type VARCHAR(50) DEFAULT 'employee'"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS org_id INTEGER"))
+            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS org_id INTEGER"))
+            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS user_id INTEGER"))
+            conn.execute(text("ALTER TABLE memory_vault ADD COLUMN IF NOT EXISTS org_id INTEGER"))
+            conn.execute(text("ALTER TABLE memory_vault ADD COLUMN IF NOT EXISTS user_id INTEGER"))
+            logger.info("Database schema columns validated / updated successfully.")
         except Exception as e:
-            logger.info(f"Column user_type might already exist: {e}")
-            
-        try:
-            conn.execute(text("ALTER TABLE users ADD COLUMN org_id INTEGER"))
-            logger.info("Added org_id column to users.")
-        except Exception as e:
-            logger.info(f"Column org_id in users might already exist: {e}")
-
-        # Multi-Tenant & User Ownership for Documents
-        try:
-            conn.execute(text("ALTER TABLE documents ADD COLUMN org_id INTEGER"))
-            logger.info("Added org_id column to documents.")
-        except Exception as e:
-            logger.info(f"Column org_id in documents might already exist: {e}")
-
-        try:
-            conn.execute(text("ALTER TABLE documents ADD COLUMN user_id INTEGER"))
-            logger.info("Added user_id column to documents.")
-        except Exception as e:
-            logger.info(f"Column user_id in documents might already exist: {e}")
-
-        # Multi-Tenant & User Ownership for Memories
-        try:
-            conn.execute(text("ALTER TABLE memory_vault ADD COLUMN org_id INTEGER"))
-            logger.info("Added org_id column to memory_vault.")
-        except Exception as e:
-            pass
-
-        try:
-            conn.execute(text("ALTER TABLE memory_vault ADD COLUMN user_id INTEGER"))
-            logger.info("Added user_id column to memory_vault.")
-        except Exception as e:
-            pass
+            logger.info(f"Schema update notice: {e}")
 
 if __name__ == "__main__":
     update_db()

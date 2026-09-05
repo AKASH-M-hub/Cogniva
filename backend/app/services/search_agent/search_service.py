@@ -44,15 +44,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 client = chromadb.PersistentClient(path="chroma_db")
 collection = client.get_or_create_collection(name="knowledge_base")
 
-_model_instance = None
-
+from app.services.embedding_service import get_embedding_model
 
 def get_model():
-    global _model_instance
-    if _model_instance is None:
-        from sentence_transformers import SentenceTransformer
-        _model_instance = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
-    return _model_instance
+    return get_embedding_model()
 
 
 STOPWORDS = {

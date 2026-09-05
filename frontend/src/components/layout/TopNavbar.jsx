@@ -42,7 +42,7 @@ export default function TopNavbar({ activeWorkspace, setActiveWorkspace }) {
       const currentUser = savedUser ? JSON.parse(savedUser) : null;
       let userId = currentUser?.id ? String(currentUser.id) : (currentUser?.email || "EMP-2026-8942");
       
-      const res = await fetch(`${API_BASE_URL}/notifications?user_id=${encodeURIComponent(userId)}`);
+      const res = await fetch(`${API_BASE_URL}/notifications/?user_id=${encodeURIComponent(userId)}`);
       if (res.ok) {
         const data = await res.json();
         setNotifications(data);
@@ -58,7 +58,7 @@ export default function TopNavbar({ activeWorkspace, setActiveWorkspace }) {
     window.addEventListener('profileUpdated', loadProfile);
     
     // Polling internally
-    const interval = setInterval(fetchNotifications, 10000);
+    const interval = setInterval(fetchNotifications, 30000);
     
     // Handle click outside
     const handleClickOutside = (e) => {

@@ -15,6 +15,7 @@ class NotificationWebhookPayload(BaseModel):
     title: str
     message: str
 
+@router.get("", include_in_schema=False)
 @router.get("/")
 def get_notifications(user_id: str = "EMP-2026-8942", db: Session = Depends(get_db)):
     """Fetch recent notifications for a user."""

@@ -517,6 +517,21 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
                       </button>
 
                       {(() => {
+                        // Central Database ("All Knowledge") protection:
+                        // Files cannot be deleted in All Knowledge because it represents the central shared organizational knowledgebase.
+                        if (!isVectorStore && historyScope === 'all') {
+                          return (
+                            <span
+                              className="px-2.5 py-1 bg-slate-50 text-slate-500 border border-slate-200/90 rounded-lg text-[10px] font-bold uppercase tracking-wider inline-flex items-center space-x-1 select-none"
+                              title="Central Knowledge Base: Protected organizational asset."
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
+                              <span>Central DB</span>
+                            </span>
+                          );
+                        }
+
+                        // In "My Uploads" (or Chroma inspector), allow the employee to delete their own uploaded documents
                         const currentUser = JSON.parse(localStorage.getItem('cogniva_user') || '{}');
                         const isSuperAdmin = currentUser?.user_type === 'cogniva_admin';
                         const isOrgAdmin = currentUser?.user_type === 'org_admin';
@@ -533,7 +548,7 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
                             <button
                               onClick={() => handleDeleteRecord(item, isVectorStore)}
                               className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 rounded-lg text-[11px] font-semibold transition-all cursor-pointer inline-flex items-center space-x-1 shadow-2xs"
-                              title={isVectorStore ? 'Delete ChromaDB vector chunk' : 'Delete document record'}
+                              title={isVectorStore ? 'Delete ChromaDB vector chunk' : 'Delete my uploaded document'}
                             >
                               <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                               <span>Delete</span>
@@ -544,7 +559,7 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
                             <button
                               disabled
                               className="px-2.5 py-1 bg-slate-50 text-slate-400 border border-slate-200 rounded-lg text-[11px] font-medium cursor-not-allowed inline-flex items-center space-x-1 select-none"
-                              title={`Protected Org Data: Uploaded by ${item.uploaded_by || 'Colleague'}. You can only delete documents you personally uploaded.`}
+                              title={`Protected: Uploaded by ${item.uploaded_by || 'Colleague'}. You can only delete documents you personally uploaded.`}
                             >
                               <Lock className="w-3.5 h-3.5 text-slate-400" />
                               <span>Protected</span>

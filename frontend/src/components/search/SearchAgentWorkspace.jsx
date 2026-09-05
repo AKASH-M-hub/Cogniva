@@ -29,7 +29,7 @@ import {
   Tag,
   TriangleAlert
 } from 'lucide-react';
-import { searchAgentAPI } from '../../services/api';
+import { searchAgentAPI, API_BASE_URL } from '../../services/api';
 
 const STOPWORDS = new Set([
   "a", "an", "the", "in", "on", "at", "to", "for", "of", "with", "by", "from",
@@ -195,7 +195,7 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
     const fileName = doc.file_name || 'document.pdf';
     try {
       // Attempt to download the original physical uploaded file from server
-      const response = await fetch(`http://127.0.0.1:8000/upload/file/${encodeURIComponent(fileName)}`);
+      const response = await fetch(`${API_BASE_URL}/upload/file/${encodeURIComponent(fileName)}`);
       if (response.ok) {
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);

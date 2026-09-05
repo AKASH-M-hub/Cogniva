@@ -111,46 +111,92 @@ export default function AnalyticsAgentWorkspace() {
     avgResponseTime: `${avgResponseTime} ms`
   };
 
-  // C: Knowledge Usage Mapping
-  // Categorize real document usage from chats and searched departments
-  const docCounts = { HR: 0, Research: 0, Finance: 0, Other: 0 };
+  // C: Knowledge Usage Mapping from 100% REAL database telemetry & history
+  const deptMap = {};
 
-  searchHistory.forEach(q => {
-    const target = (q.department || q.file_type || '').toLowerCase();
-    if (target.includes('hr') || target.includes('human')) docCounts.HR += 2;
-    else if (target.includes('research') || target.includes('scout')) docCounts.Research += 2;
-    else if (target.includes('finance') || target.includes('money')) docCounts.Finance += 2;
-    else docCounts.Other += 1;
-  });
-
-  chatSessions.forEach(c => {
-    if (c.docName) {
-      if (c.docName.toLowerCase().includes('hr')) docCounts.HR += 1;
-      else if (c.docName.toLowerCase().includes('research')) docCounts.Research += 1;
-      else if (c.docName.toLowerCase().includes('finance')) docCounts.Finance += 1;
-      else docCounts.Other += 1;
+  const serverDepts = telemetry?.user_analytics?.department_usage || [];
+  serverDepts.forEach(d => {
+    const name = d.department || 'General';
+    if (d.queries > 0) {
+      deptMap[name] = (deptMap[name] || 0) + d.queries;
     }
   });
 
-  const totalAccesses = docCounts.HR + docCounts.Research + docCounts.Finance + docCounts.Other || 1;
+  searchHistory.forEach(q => {
+    const dept = q.department || 'Engineering & Product';
+    deptMap[dept] = (deptMap[dept] || 0) + 1;
+  });
+
+  chatSessions.forEach(c => {
+    const dept = c.department || (c.docName?.includes('HR') ? 'HR & Governance' : (c.docName?.includes('Finance') ? 'Finance & Legal' : 'Engineering & Product'));
+    deptMap[dept] = (deptMap[dept] || 0) + 1;
+  });
+
+  const totalAccesses = Object.values(deptMap).reduce((a, b) => a + b, 0);
+  const colorPalette = ['bg-indigo-500', 'bg-rose-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500', 'bg-slate-400'];
 
   const knowledgeUsage = {
-    total: totalAccesses === 1 && totalQueries === 0 ? 0 : totalAccesses,
-    breakdown: [
-      { name: 'HR Documents', count: docCounts.HR, color: 'bg-rose-500' },
-      { name: 'Research Documents', count: docCounts.Research, color: 'bg-indigo-500' },
-      { name: 'Finance Documents', count: docCounts.Finance, color: 'bg-emerald-500' },
-      { name: 'Other Documents', count: docCounts.Other, color: 'bg-slate-400' }
+    total: totalAccesses,
+    breakdown: Object.keys(deptMap).length > 0 ? (
+      Object.entries(deptMap).map(([deptName, count], idx) => ({
+        name: `${deptName} Documents`,
+        count,
+        color: colorPalette[idx % colorPalette.length]
+      }))
+    ) : [
+      { name: 'Engineering & Product', count: 0, color: 'bg-indigo-500' },
+      { name: 'HR & Governance', count: 0, color: 'bg-rose-500' },
+      { name: 'Finance & Legal', count: 0, color: 'bg-emerald-500' },
+      { name: 'General Enterprise', count: 0, color: 'bg-slate-400' }
     ]
   };
 
-  // E: Dynamic Weekly Trend matching Total Queries Proportions
+  // E: 100% REAL Weekly Query Frequency from actual database timestamps
+  const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dayCounts = { 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0, 'Sun': 0 };
+
+  const serverWeekly = telemetry?.search_analytics?.weekly_trend;
+  if (Array.isArray(serverWeekly) && serverWeekly.length > 0) {
+    serverWeekly.forEach(w => {
+      if (dayCounts[w.name] !== undefined) {
+        dayCounts[w.name] = w.queries;
+      }
+    });
+  } else {
+    searchHistory.forEach(s => {
+      const rawDate = s.timestamp || s.search_time;
+      if (rawDate) {
+        const d = new Date(rawDate);
+        if (!isNaN(d.getTime())) {
+          const dayName = daysOfWeek[d.getDay()];
+          if (dayCounts[dayName] !== undefined) {
+            dayCounts[dayName] += 1;
+          }
+        }
+      }
+    });
+
+    chatSessions.forEach(c => {
+      if (c.timestamp) {
+        const d = new Date(c.timestamp);
+        if (!isNaN(d.getTime())) {
+          const dayName = daysOfWeek[d.getDay()];
+          if (dayCounts[dayName] !== undefined) {
+            dayCounts[dayName] += 1;
+          }
+        }
+      }
+    });
+  }
+
   const weeklyData = [
-    { name: 'Mon', queries: Math.max(1, Math.round(stats.totalQueries * 0.15)) },
-    { name: 'Tue', queries: Math.max(2, Math.round(stats.totalQueries * 0.30)) },
-    { name: 'Wed', queries: Math.max(1, Math.round(stats.totalQueries * 0.20)) },
-    { name: 'Thu', queries: Math.max(3, Math.round(stats.totalQueries * 0.25)) },
-    { name: 'Fri', queries: Math.max(1, Math.round(stats.totalQueries * 0.10)) },
+    { name: 'Mon', queries: dayCounts['Mon'] },
+    { name: 'Tue', queries: dayCounts['Tue'] },
+    { name: 'Wed', queries: dayCounts['Wed'] },
+    { name: 'Thu', queries: dayCounts['Thu'] },
+    { name: 'Fri', queries: dayCounts['Fri'] },
+    { name: 'Sat', queries: dayCounts['Sat'] },
+    { name: 'Sun', queries: dayCounts['Sun'] },
   ];
 
   // F: Dynamic Notifications mapped from real data presence
@@ -311,7 +357,7 @@ export default function AnalyticsAgentWorkspace() {
               <span>My Usage Trends</span>
             </h2>
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs h-[300px] flex flex-col">
-              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Query Frequency (Mon - Fri)</div>
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Query Frequency (Mon - Sun)</div>
               <div className="flex-1 w-full relative -ml-4">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>

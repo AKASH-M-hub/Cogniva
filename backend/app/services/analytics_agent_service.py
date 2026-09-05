@@ -29,12 +29,28 @@ def get_search_telemetry(db: Session) -> Dict[str, Any]:
         for f in failed_query_records
     ]
 
+    # Calculate real weekly trend from database timestamps
+    day_abbrs = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    counts_by_day = {d: 0 for d in day_abbrs}
+    
+    try:
+        all_search_times = db.query(SearchHistory.timestamp).all()
+        for (ts,) in all_search_times:
+            if ts:
+                day_name = day_abbrs[ts.weekday()]
+                counts_by_day[day_name] += 1
+    except Exception:
+        pass
+        
+    weekly_trend = [{"name": d, "queries": counts_by_day[d]} for d in day_abbrs]
+
     return {
         "total_searches": total_searches,
         "search_success_rate": f"{success_rate}%",
         "avg_search_time_ms": 14.2 if total_searches > 0 else 0.0,
         "failed_searches_count": failed_count,
-        "failed_searches_list": failed_searches
+        "failed_searches_list": failed_searches,
+        "weekly_trend": weekly_trend
     }
 
 

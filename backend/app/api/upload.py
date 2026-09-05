@@ -137,7 +137,7 @@ def upload_document(
                 chunk_rec = ChunkModel(
                     document_id=doc_id,
                     chunk_no=idx + 1,
-                    chunk_text=chunk_str[:500],  # preview
+                    chunk_text=chunk_str,
                     token_count=len(chunk_str.split()),
                     chroma_doc_id=f"{file.filename}_chunk_{idx}"
                 )
@@ -372,9 +372,11 @@ def get_upload_history(
     except Exception as e:
         print(f"Memory table history fetch note: {e}")
 
+    total_vectors = sum(item.get("chunks", 1) for item in history)
     return {
         "success": True,
         "total_items": len(history),
+        "total_vectors": total_vectors,
         "history": history
     }
 

@@ -68,8 +68,8 @@ def generate_ollama_text(prompt: str) -> Optional[str]:
             "prompt": prompt,
             "stream": False
         }
-        # Use short timeout (3.0s) so if Ollama is not running in cloud, it fails fast
-        response = requests.post(url, json=payload, timeout=3.0)
+        # 5s connect timeout to fail fast if offline, 90s read timeout for model inference
+        response = requests.post(url, json=payload, timeout=(5.0, 90.0))
         if response.status_code == 200:
             data = response.json()
             return data.get("response", "").strip()
@@ -154,23 +154,17 @@ def synthesize_smart_context_answer(question: str, context: str) -> str:
 
 def generate_llm_text(prompt: str, context: str = "", question: str = "") -> str:
     """
-    Resilient Multi-Tier LLM Generator:
-    1. Google Gemini API (if GEMINI_API_KEY is available)
-    2. Local Ollama (if running on host)
-    3. Intelligent Context Grounding Synthesizer (never fails, zero external dependencies)
+    1. Primary: Ollama (Your Qwen 2.5 3B model)
+    2. Fallback: Intelligent Context Grounding Synthesizer (never crashes)
     """
-    # Tier 1: Try Gemini
-    gemini_res = generate_gemini_text(prompt)
-    if gemini_res and len(gemini_res) > 20:
-        return gemini_res
-
-    # Tier 2: Try Ollama
+    # Primary: Call Ollama Qwen 2.5 3B
     ollama_res = generate_ollama_text(prompt)
     if ollama_res and len(ollama_res) > 20:
         return ollama_res
 
-    # Tier 3: Grounded context synthesis (guaranteed answer without connection failure)
+    # Fallback: Grounded context synthesis from document chunks
     return synthesize_smart_context_answer(question or "Summary", context or prompt)
+
 
 
 def synthesize_fast_response(question: str, doc_results: List[Any], doc_context: Optional[str] = None) -> str:

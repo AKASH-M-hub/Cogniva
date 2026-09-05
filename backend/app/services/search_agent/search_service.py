@@ -246,6 +246,69 @@ def execute_enterprise_search(
         except Exception as e:
             print(f"[SearchAgent] Keyword match notice: {e}")
 
+    # 4b. Persistent Neon PostgreSQL Fallback (Prevents empty search when Render restarts ChromaDB)
+    if not raw_chunks:
+        try:
+            from app.database.postgres import SessionLocal
+            from app.models.document import Document as DocModel, DocumentChunk as ChunkModel
+            from app.models.memory import Memory as MemModel
+
+            with SessionLocal() as db_session:
+                clean_terms = [w.lower() for w in keywords if len(w) > 2]
+                q_lower = effective_query.lower()
+
+                doc_records = db_session.query(DocModel).all()
+                for d_rec in doc_records:
+                    fname_lower = d_rec.filename.lower()
+                    name_matched = any(term in fname_lower for term in clean_terms) or (fname_lower in q_lower) or any(part in q_lower for part in fname_lower.split('_') if len(part) > 3)
+                    
+                    chunks = db_session.query(ChunkModel).filter(ChunkModel.document_id == d_rec.id).order_by(ChunkModel.chunk_no).all()
+                    for c in chunks:
+                        c_text = c.chunk_text or ""
+                        c_lower = c_text.lower()
+                        hits = sum(1 for term in clean_terms if term in c_lower)
+                        if hits > 0 or name_matched:
+                            c_score = 0.88 if name_matched else min(0.92, 0.65 + (hits * 0.10))
+                            ext = d_rec.filename.split(".")[-1].lower() if "." in d_rec.filename else "txt"
+                            raw_chunks.append({
+                                "chunk_id": f"{d_rec.filename}_chunk_{c.chunk_no}",
+                                "filename": d_rec.filename,
+                                "document_id": str(d_rec.id),
+                                "file_type": ext.upper(),
+                                "department": d_rec.department or department or "General",
+                                "category": "Enterprise Document",
+                                "score": round(c_score, 4),
+                                "content": c_text,
+                                "chunk_index": c.chunk_no,
+                                "page": c.page or c.chunk_no,
+                                "timestamp": str(d_rec.upload_date or ""),
+                                "metadata": {"filename": d_rec.filename, "document_id": str(d_rec.id)}
+                            })
+
+                mem_records = db_session.query(MemModel).all()
+                for m in mem_records:
+                    m_content = f"{m.title}\n{m.decision}\n{m.reason or ''}"
+                    m_lower = m_content.lower()
+                    m_hits = sum(1 for term in clean_terms if term in m_lower)
+                    if m_hits > 0 or any(term in m.title.lower() for term in clean_terms):
+                        m_score = min(0.95, 0.70 + (m_hits * 0.10))
+                        raw_chunks.append({
+                            "chunk_id": f"mem_{m.id}",
+                            "filename": m.title or f"Memory #{m.id}",
+                            "document_id": str(m.id),
+                            "file_type": "TEXT",
+                            "department": m.department or department or "General",
+                            "category": "Organizational Memory",
+                            "score": round(m_score, 4),
+                            "content": m_content,
+                            "chunk_index": 1,
+                            "page": 1,
+                            "timestamp": str(m.created_at or ""),
+                            "metadata": {"title": m.title}
+                        })
+        except Exception as pg_err:
+            print(f"[SearchAgent] PostgreSQL fallback retrieval notice: {pg_err}")
+
     # 5. Chunk -> Source Document Mapping & Document Relevance Scoring
     doc_map = {}
     for chunk in raw_chunks:
@@ -253,6 +316,7 @@ def execute_enterprise_search(
         if doc_key not in doc_map:
             doc_map[doc_key] = []
         doc_map[doc_key].append(chunk)
+
 
     mapped_documents = []
     for filename, chunks in doc_map.items():

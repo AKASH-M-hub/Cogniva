@@ -17,8 +17,9 @@ class Settings:
     )
 
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-    OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+    OLLAMA_URL = os.getenv("OLLAMA_URL", "https://akashhhhwqx-cogniva-ollama.hf.space")
     OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
+    HF_SPACE = os.getenv("HF_SPACE", "Akashhhhwqx/cogniva-ollama")
     N8N_URL = os.getenv("N8N_URL", "http://localhost:5678").rstrip("/")
 
     SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.60"))

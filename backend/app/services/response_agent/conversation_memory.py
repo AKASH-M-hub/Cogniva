@@ -29,12 +29,17 @@ def resolve_conversational_context(user_id: str, question: str, document_context
     q_lower = q_clean.lower()
     history = CONVERSATION_HISTORY_STORE.get(user_id, [])
 
-    # If document_context is provided (e.g. from Explore Echo)
+    # If document_context is provided (e.g. from Explore Echo or active document view)
     if document_context:
+        doc_refs = ["it", "this", "file", "document", "takeaway", "takeaways", "findings", "equation", "equations", "summary", "summarize", "topic", "topics", "content", "points", "author", "agenda", "lecture", "law"]
         short_followups = ["explain breifly", "explain briefly", "summarize", "tell me more", "details", "explain", "overview", "what does this mean", "why", "give key points"]
-        if any(f in q_lower for f in short_followups) or len(q_clean.split()) <= 3:
-            return f"Summarize and explain the key findings and details from document '{document_context}'", True
-        return f"{q_clean} (regarding document '{document_context}')", True
+        
+        # If user explicitly refers to the document or asks a short follow-up
+        if any(f in q_lower for f in short_followups) or len(q_clean.split()) <= 4:
+            return f"{q_clean} (regarding document '{document_context}')", True
+        elif any(ref in q_lower.split() for ref in doc_refs):
+            return f"{q_clean} (regarding document '{document_context}')", True
+        # Otherwise, keep question standalone so unrelated queries search knowledge base cleanly
 
     if not history:
         short_followups = ["explain breifly", "explain briefly", "summarize", "tell me more", "details", "explain"]

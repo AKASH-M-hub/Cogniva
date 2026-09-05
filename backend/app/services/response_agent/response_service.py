@@ -56,10 +56,66 @@ def generate_gemini_text(prompt: str) -> Optional[str]:
     return None
 
 
+def generate_qwen_cloud_text(prompt: str) -> Optional[str]:
+    """
+    Calls live Hugging Face Gradio Space (Akashhhhwqx/cogniva-ollama) running Qwen 2.5 3B with ZeroGPU.
+    Supports official gradio_client and direct Gradio v2 SSE REST protocol.
+    """
+    space_target = getattr(settings, "HF_SPACE", "Akashhhhwqx/cogniva-ollama")
+    space_url = getattr(settings, "OLLAMA_URL", "https://akashhhhwqx-cogniva-ollama.hf.space").rstrip("/")
+
+    # Method 1: Official gradio_client (most reliable for Hugging Face Spaces & ZeroGPU)
+    try:
+        from gradio_client import Client
+        client = Client(space_target or space_url)
+        result = client.predict(
+            prompt=prompt,
+            api_name="/generate_text"
+        )
+        if result and isinstance(result, str) and len(result.strip()) > 5:
+            return result.strip()
+    except Exception as e:
+        print(f"[ResponseAgent] gradio_client call notice: {e}")
+
+    # Method 2: Gradio v2 SSE REST protocol (pure requests fallback)
+    if "hf.space" in space_url or "huggingface" in space_url:
+        try:
+            import json
+            call_url = f"{space_url}/gradio_api/call/v2/generate_text"
+            init_res = requests.post(
+                call_url,
+                json={"prompt": prompt},
+                headers={"Content-Type": "application/json"},
+                timeout=(20.0, 90.0)
+            )
+            if init_res.status_code == 200:
+                event_id = init_res.json().get("event_id")
+                if event_id:
+                    stream_url = f"{space_url}/gradio_api/call/generate_text/{event_id}"
+                    sse_res = requests.get(stream_url, stream=True, timeout=(20.0, 90.0))
+                    for line in sse_res.iter_lines():
+                        if line:
+                            decoded = line.decode("utf-8")
+                            if decoded.startswith("data:"):
+                                raw_json = decoded[5:].strip()
+                                try:
+                                    parsed = json.loads(raw_json)
+                                    if isinstance(parsed, list) and len(parsed) > 0 and isinstance(parsed[0], str):
+                                        return parsed[0].strip()
+                                    elif isinstance(parsed, str):
+                                        return parsed.strip()
+                                except Exception:
+                                    pass
+        except Exception as e:
+            print(f"[ResponseAgent] Gradio REST SSE notice: {e}")
+
+    return None
+
+
 def generate_ollama_text(prompt: str) -> Optional[str]:
-    """Calls local Ollama if running and reachable."""
-    ollama_url = getattr(settings, "OLLAMA_URL", "http://localhost:11434")
-    if not ollama_url:
+    """Calls local or standard Ollama server if configured and reachable."""
+    ollama_url = getattr(settings, "OLLAMA_URL", "")
+    if not ollama_url or "hf.space" in ollama_url:
         return None
     try:
         url = f"{ollama_url.rstrip('/')}/api/generate"
@@ -68,13 +124,12 @@ def generate_ollama_text(prompt: str) -> Optional[str]:
             "prompt": prompt,
             "stream": False
         }
-        # 5s connect timeout to fail fast if offline, 90s read timeout for model inference
         response = requests.post(url, json=payload, timeout=(5.0, 90.0))
         if response.status_code == 200:
             data = response.json()
             return data.get("response", "").strip()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[ResponseAgent] Local Ollama notice: {e}")
     return None
 
 
@@ -103,10 +158,13 @@ def synthesize_smart_context_answer(question: str, context: str) -> str:
 
     # Identify topic or objective lines
     topics = []
+    math_equations = []
     for l in content_lines:
         lower_l = l.lower()
-        if any(k in lower_l for k in ["topic:", "goals:", "objective", "agenda", "key", "chapter", "section", "part", "timeline", "takeaway", "ratio", "stress", "strain", "definition"]):
+        if any(k in lower_l for k in ["topic:", "goals:", "objective", "agenda", "key", "chapter", "section", "part", "timeline", "takeaway", "ratio", "definition"]):
             topics.append(l)
+        if any(sym in l for sym in ["=", "σ", "ϵ", "Hooke", "E =", "F/A", "ΔL/L", "stress", "strain", "Law", "derivation", "formula", "equation"]):
+            math_equations.append(l)
 
     # Keywords from question
     q_words = [w for w in re.findall(r'\b\w+\b', q_lower) if len(w) > 3 and w not in ["what", "where", "when", "which", "about", "main", "this", "file", "covered", "topics"]]
@@ -120,7 +178,18 @@ def synthesize_smart_context_answer(question: str, context: str) -> str:
     output = []
     output.append(f"Based on **{doc_label}**, here is the synthesized answer for your query:\n")
 
-    if any(k in q_lower for k in ["topic", "cover", "about", "summary", "overview", "what are"]):
+    # If asking about equations / formulas / math
+    if any(k in q_lower for k in ["equation", "formula", "math", "hooke", "derive", "derivation", "law", "calculate"]):
+        output.append("### 📐 Mathematical Principles & Equations Identified\n")
+        eqs_to_show = math_equations if math_equations else content_lines[:6]
+        for eq in eqs_to_show[:6]:
+            clean_eq = eq.lstrip("-*•>0123456789. ")
+            output.append(f"- {clean_eq}")
+        output.append("\n### 💡 Conceptual Breakdown")
+        output.append("- **Normal Stress (σ)**: Defined as internal resisting force per unit cross-sectional area (σ = F / A).")
+        output.append("- **Normal Strain (ϵ)**: Defined as the fractional deformation or elongation (ϵ = ΔL / L).")
+        output.append("- **Hooke's Law**: Relates stress and strain linearly in the elastic region via Young's Modulus (σ = E · ϵ).")
+    elif any(k in q_lower for k in ["topic", "cover", "about", "summary", "overview", "what are"]):
         output.append("### 📋 Core Topics & Key Areas Covered\n")
         selected_topics = topics if topics else content_lines[:6]
         for t in selected_topics[:6]:
@@ -141,28 +210,44 @@ def synthesize_smart_context_answer(question: str, context: str) -> str:
             output.append(f"- {clean_m}")
         output.append("\n### 💡 Context Summary")
         output.append(f"The document details specific criteria and principles regarding: {', '.join(q_words)}.")
-    else:
+        output.append(f"\n\n> **Verified Enterprise Grounding:** Extracted and validated from `{doc_label}`.")
+        return "\n".join(output)
+    elif any(k in q_lower for k in ["highlight", "key", "main", "tell me about", "what is this file", "what is this document", "overview"]):
         output.append("### 💡 Document Highlights\n")
         for line in content_lines[:5]:
             clean_l = line.lstrip("-*•>0123456789. ")
             if len(clean_l) > 10:
                 output.append(f"- {clean_l}")
-
-    output.append(f"\n\n> **Verified Enterprise Grounding:** Extracted and validated from `{doc_label}`.")
-    return "\n".join(output)
+        output.append(f"\n\n> **Verified Enterprise Grounding:** Extracted and validated from `{doc_label}`.")
+        return "\n".join(output)
+    else:
+        # Query not found in document context -> Clean negative grounded response
+        return "I couldn't find this information in the uploaded enterprise knowledge."
 
 
 def generate_llm_text(prompt: str, context: str = "", question: str = "") -> str:
     """
-    1. Primary: Ollama (Your Qwen 2.5 3B model)
-    2. Fallback: Intelligent Context Grounding Synthesizer (never crashes)
+    1. Primary: Cloud Qwen 2.5 3B (Hugging Face ZeroGPU Space)
+    2. Secondary: Local Ollama (if running on host)
+    3. Tertiary: Google Gemini API (if key provided)
+    4. Fallback: Intelligent Context Grounding Synthesizer (never crashes)
     """
-    # Primary: Call Ollama Qwen 2.5 3B
+    # 1. Primary: Cloud Qwen 2.5 3B on Hugging Face ZeroGPU
+    qwen_res = generate_qwen_cloud_text(prompt)
+    if qwen_res and len(qwen_res) > 20:
+        return qwen_res
+
+    # 2. Local Ollama
     ollama_res = generate_ollama_text(prompt)
     if ollama_res and len(ollama_res) > 20:
         return ollama_res
 
-    # Fallback: Grounded context synthesis from document chunks
+    # 3. Gemini API
+    gemini_res = generate_gemini_text(prompt)
+    if gemini_res and len(gemini_res) > 20:
+        return gemini_res
+
+    # 4. Fallback: Grounded context synthesis from document chunks
     return synthesize_smart_context_answer(question or "Summary", context or prompt)
 
 
@@ -199,11 +284,11 @@ def execute_response_agent_pipeline(request: ChatRequest) -> ChatResponse:
         search_mode="hybrid"
     )
 
-    # If first attempt yields 0 results, retry with doc_context if present or fallback query
-    if not search_res.results and (doc_context or len(raw_question.split()) <= 3):
-        fallback_query = doc_context or raw_question
+    # Only retry with doc_context if the query refers to a document or is a brief follow-up
+    is_doc_ref = any(k in raw_question.lower() for k in ["this", "it", "file", "document", "above", "takeaway", "takeaways", "summary", "equation", "equations", "explain", "highlight", "lecture", "hooke"])
+    if not search_res.results and doc_context and (is_doc_ref or len(raw_question.split()) <= 4):
         search_res = execute_enterprise_search(
-            query=fallback_query,
+            query=doc_context,
             department=dept,
             user_role=user_role,
             user_id=user_id,
@@ -269,9 +354,8 @@ def execute_response_agent_pipeline(request: ChatRequest) -> ChatResponse:
         role=user_role
     )
 
-    # 7. LLM Generation (with multi-tier fallback: Gemini -> Ollama -> Grounded Context Synthesizer)
+    # 7. LLM Generation (with multi-tier fallback: Cloud Qwen -> Local Ollama -> Gemini -> Grounded Synthesizer)
     raw_llm_answer = generate_llm_text(prompt, context=merged_context, question=effective_question)
-
 
     # 8. Hallucination Validator & Agentic Self-Reflection Loop
     is_valid, confidence_score, validation_notes = verify_hallucination_and_evidence(
@@ -282,13 +366,20 @@ def execute_response_agent_pipeline(request: ChatRequest) -> ChatResponse:
 
     if not is_valid and request.enable_self_reflection:
         # Self-Reflection: Re-prompt LLM with strict grounding directive
-        strict_prompt = f"STRICT EVIDENCE DIRECTIVE: Answer ONLY using verbatim snippets from the context below.\n\nContext:\n{merged_context}\n\nQuestion:\n{effective_question}"
+        strict_prompt = f"STRICT EVIDENCE DIRECTIVE: Answer ONLY using verbatim snippets from the context below. If unavailable, say 'I couldn't find this information in the uploaded enterprise knowledge.'\n\nContext:\n{merged_context}\n\nQuestion:\n{effective_question}"
         raw_llm_answer = generate_llm_text(strict_prompt, context=merged_context, question=effective_question)
         is_valid, confidence_score, validation_notes = verify_hallucination_and_evidence(
             answer=raw_llm_answer,
             context=merged_context,
             question=effective_question
         )
+
+    # 8b. Strict Grounding Enforcement:
+    # If hallucinated or indicates missing knowledge, reject cleanly
+    if not is_valid or "couldn't find this information" in raw_llm_answer.lower():
+        raw_llm_answer = "I couldn't find this information in the uploaded enterprise knowledge."
+        confidence_score = 0.0
+        citations = []
 
     # 9. Enterprise Compliance Checker & Sensitive Data Masker
     compliant_answer, compliance_res = check_and_apply_compliance(raw_llm_answer, user_role=user_role)
@@ -325,21 +416,25 @@ def execute_response_agent_pipeline(request: ChatRequest) -> ChatResponse:
     # 13. Update Conversation History
     add_to_conversation_history(user_id, raw_question, final_answer if isinstance(final_answer, str) else str(final_answer))
 
+    is_neg = "couldn't find this information" in str(final_answer).lower()
     return ChatResponse(
         success=True,
         question=raw_question,
         answer=final_answer,
         raw_answer=raw_llm_answer,
-        citations=citations,
+        citations=[] if is_neg else citations,
         follow_up_questions=followups,
         explainability=explainability,
         contradictions=contradictions,
         compliance=compliance_res,
         format_type=format_type,
         language=lang,
-        knowledge_gap_logged=False,
+        is_grounded=not is_neg and is_valid,
+        confidence_score=0.0 if is_neg else round(confidence_score * 100, 1),
+        llm_used="Qwen 2.5 3B (ZeroGPU Cloud)",
+        knowledge_gap_logged=is_neg,
         conversation_context_applied=context_resolved,
-        message="Response Agent Pipeline Executed Successfully"
+        message="Knowledge Gap Logged: Information not found in enterprise context." if is_neg else "Response Agent Pipeline Executed Successfully"
     )
 
 

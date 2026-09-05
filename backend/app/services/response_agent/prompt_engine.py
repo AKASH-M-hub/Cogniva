@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 PROMPT_INTENT_TEMPLATES = {
     "compare": """You are Cogniva Enterprise AI.
@@ -67,14 +67,17 @@ def build_adaptive_prompt(
 
     full_prompt = f"""{system_instruction}
 
+CRITICAL STRICT GROUNDING RULES:
+1. You are strictly an Enterprise Knowledge Assistant.
+2. Answer the user's question based EXCLUSIVELY on the facts, concepts, equations, and data provided in the "Enterprise Knowledge" section below.
+3. If the user's question asks about external topics, general trivia, unrelated entities, or anything NOT covered in the provided Enterprise Knowledge, you MUST NOT answer from general knowledge and you MUST NOT guess or hallucinate.
+4. If the information is not directly in the Enterprise Knowledge below, reply EXACTLY:
+"I couldn't find this information in the uploaded enterprise knowledge."
+
 Persona Mode: {persona.upper()} ({persona_instruction})
 Tone: {tone.capitalize()}
 Role Scope: {role.upper()}
 Language Instruction: {language_instruction}
-
-Answer ONLY using the enterprise knowledge below. Do NOT make up information.
-If the answer is unavailable in the context, reply exactly:
-"I couldn't find this information in the uploaded enterprise knowledge."
 
 ==============================
 Enterprise Knowledge

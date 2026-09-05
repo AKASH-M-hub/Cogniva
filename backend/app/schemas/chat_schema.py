@@ -56,6 +56,9 @@ class ChatResponse(BaseModel):
     compliance: ComplianceResult
     format_type: str = Field("markdown", description="markdown, table, executive_summary, bulleted_list")
     language: str = "english"
+    is_grounded: bool = True
+    confidence_score: float = 95.0
+    llm_used: Optional[str] = "Qwen 2.5 3B"
     knowledge_gap_logged: bool = False
     conversation_context_applied: bool = False
     message: str = "Enterprise Response Agent Execution Completed"

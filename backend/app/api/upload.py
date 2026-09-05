@@ -11,6 +11,7 @@ from app.services.upload_service import save_pdf
 from app.services.pdf_service import extract_text
 from app.services.vector_service import store_embeddings
 from app.database.postgres import get_db
+from app.config.settings import settings
 
 router = APIRouter(
     prefix="/upload",
@@ -39,7 +40,7 @@ async def n8n_proxy(file: UploadFile = File(...), user_email: str = Form("defaul
     
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.post("http://localhost:5678/webhook/knowledge-upload", data=data, files=files, timeout=60.0)
+            resp = await client.post(f"{settings.N8N_URL}/webhook/knowledge-upload", data=data, files=files, timeout=60.0)
             
         if resp.status_code != 200:
             raise HTTPException(status_code=500, detail=f"n8n webhook returned error code {resp.status_code}: {resp.text}")

@@ -23,7 +23,7 @@ for url in candidate_urls:
     try:
         candidate_engine = create_engine(
             url,
-            connect_args={"connect_timeout": 1},
+            connect_args={"connect_timeout": 10},
             pool_pre_ping=True,
             pool_size=10,
             max_overflow=20,
@@ -35,8 +35,8 @@ for url in candidate_urls:
         engine = candidate_engine
         logger.info(f"Connected to PostgreSQL database successfully at {url.split('@')[-1]}")
         break
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Could not connect to PostgreSQL candidate URL: {e}")
 
 if engine is None:
     logger.info("Using local database engine: sqlite:///./cogniva.db")

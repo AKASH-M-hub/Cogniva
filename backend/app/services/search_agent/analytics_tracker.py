@@ -56,8 +56,9 @@ def log_search_execution(
                 try:
                     import urllib.request
                     import json
+                    from app.config.settings import settings
                     req = urllib.request.Request(
-                        'http://127.0.0.1:5678/webhook/knowledge-gap',
+                        f'{settings.N8N_URL}/webhook/knowledge-gap',
                         data=json.dumps({
                             'user_id': user_id or 'System',
                             'user_email': user_email or 'akashmohanraj333@gmail.com',

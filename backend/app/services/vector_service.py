@@ -19,10 +19,10 @@ def get_model():
     return _model_instance
 
 
-def store_embeddings(filename, chunks, department="Engineering", document_id=None, category="General", timestamp=None):
+def store_embeddings(filename, chunks, department="Engineering", document_id=None, category="General", timestamp=None, org_id=None, user_id=None):
     """
     Stores vector embeddings into ChromaDBPersistentClient.
-    Pairs semantic vectors with rich metadata linked to PostgreSQL tables.
+    Pairs semantic vectors with rich metadata linked to PostgreSQL tables and multi-tenant organization.
     """
     if not chunks:
         return 0
@@ -49,6 +49,8 @@ def store_embeddings(filename, chunks, department="Engineering", document_id=Non
             "department": department,
             "category": category,
             "document_id": str(document_id) if document_id else "N/A",
+            "org_id": str(org_id) if org_id is not None else "",
+            "user_id": str(user_id) if user_id is not None else "",
             "timestamp": timestamp
         })
 

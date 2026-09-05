@@ -1,10 +1,18 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 0,
+  timeout: 15000,
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('cogniva_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 export const searchAgentAPI = {
@@ -42,9 +50,10 @@ export const searchAgentAPI = {
   },
 
   // Get Search History from PostgreSQL
-  getHistory: async () => {
+  getHistory: async (userId = null) => {
     try {
-      const response = await api.get('/search/history');
+      const url = userId ? `/search/history?user_id=${encodeURIComponent(userId)}` : '/search/history';
+      const response = await api.get(url);
       return response.data;
     } catch (error) {
       console.error('Search History error:', error);
@@ -53,9 +62,10 @@ export const searchAgentAPI = {
   },
 
   // Clear Search History in PostgreSQL
-  clearHistory: async () => {
+  clearHistory: async (userId = null) => {
     try {
-      const response = await api.delete('/search/history/clear');
+      const url = userId ? `/search/history/clear?user_id=${encodeURIComponent(userId)}` : '/search/history/clear';
+      const response = await api.delete(url);
       return response.data;
     } catch (error) {
       console.error('Clear Search History error:', error);
@@ -101,13 +111,18 @@ export const responseAgentAPI = {
 
 export const knowledgeHubAPI = {
   // Upload physical document (PDF, DOCX, TXT)
-  uploadDocument: async (file, userEmail = "akashm.student@saveetha.ac.in") => {
+  uploadDocument: async (file, userEmail = "employee@cogniva.ai", uploadedBy = null, department = null, orgId = null, userId = null) => {
     try {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('user_email', userEmail);
-      // Route document upload through n8n automation webhook (via backend proxy to bypass CORS)
-      const response = await api.post('/upload/n8n-proxy', formData, {
+      if (uploadedBy) formData.append('uploaded_by', uploadedBy);
+      if (department) formData.append('department', department);
+      if (orgId) formData.append('org_id', orgId);
+      if (userId) formData.append('user_id', userId);
+
+      // Direct upload to FastAPI /upload/ with multi-tenant tracking
+      const response = await api.post('/upload/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       return response.data;
@@ -128,10 +143,16 @@ export const knowledgeHubAPI = {
     }
   },
 
-  // Get user document upload & memory history
-  getHistory: async () => {
+  // Get user document upload & memory history with multi-tenant scoping
+  getHistory: async (userId = null, scope = 'all', orgId = null, userType = null) => {
     try {
-      const response = await api.get('/upload/history');
+      const params = new URLSearchParams();
+      if (userId) params.append('user_id', userId);
+      if (scope) params.append('scope', scope);
+      if (orgId) params.append('org_id', orgId);
+      if (userType) params.append('user_type', userType);
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+      const response = await api.get(`/upload/history${queryStr}`);
       return response.data;
     } catch (error) {
       console.error('Get Upload History API error:', error);
@@ -150,10 +171,14 @@ export const knowledgeHubAPI = {
     }
   },
 
-  // Clear all physical upload files, ChromaDB vectors, and PostgreSQL records
-  clearAllData: async () => {
+  // Clear physical upload files, ChromaDB vectors, and records (Admin only)
+  clearAllData: async (userType = null, orgId = null) => {
     try {
-      const response = await api.delete('/upload/clear-all');
+      const params = new URLSearchParams();
+      if (userType) params.append('user_type', userType);
+      if (orgId) params.append('org_id', orgId);
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+      const response = await api.delete(`/upload/clear-all${queryStr}`);
       return response.data;
     } catch (error) {
       console.error('Clear All Data API error:', error);
@@ -161,14 +186,21 @@ export const knowledgeHubAPI = {
     }
   },
 
-  // Delete individual record document or memory
-  deleteRecord: async (recordId) => {
+  // Delete individual record document or memory with ownership validation
+  deleteRecord: async (recordId, userId = null, userEmail = null, userType = null, orgId = null) => {
     try {
-      const response = await api.delete(`/upload/record/${encodeURIComponent(recordId)}`);
+      const params = new URLSearchParams();
+      if (userId) params.append('user_id', userId);
+      if (userEmail) params.append('user_email', userEmail);
+      if (userType) params.append('user_type', userType);
+      if (orgId) params.append('org_id', orgId);
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+      const response = await api.delete(`/upload/record/${encodeURIComponent(recordId)}${queryStr}`);
       return response.data;
     } catch (error) {
       console.error('Delete Record API error:', error);
-      return { success: false };
+      const errMsg = error.response?.data?.detail || error.response?.data?.message || 'Failed to delete record';
+      return { success: false, message: errMsg, status: error.response?.status };
     }
   },
 
@@ -511,9 +543,10 @@ export const analyticsAgentAPI = {
 };
 
 export const adminAPI = {
-  getEmployees: async () => {
+  getEmployees: async (orgId = null) => {
     try {
-      const response = await api.get('/api/admin/employees');
+      const url = orgId ? `/api/admin/employees?org_id=${orgId}` : '/api/admin/employees';
+      const response = await api.get(url);
       return response.data;
     } catch (error) {
       console.error('getEmployees error:', error);

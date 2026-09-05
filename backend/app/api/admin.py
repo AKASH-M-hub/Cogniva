@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database.postgres import get_db
 from app.models.user import User, Organization
@@ -31,26 +32,52 @@ def delete_employee(employee_id: int, db: Session = Depends(get_db)):
     return {"success": True, "message": "Employee access revoked"}
 
 @router.get("/employees")
-def get_employees(db: Session = Depends(get_db)):
-    """Organization Admin: List employees using Cogniva"""
-    users = db.query(User).all()
-    if not users:
-        return [
-            {"id": 1, "full_name": "Arshiy Jabeen", "email": "arshiy@xyz.com", "role": "Enterprise Analyst", "department": "Engineering & Product"},
-            {"id": 2, "full_name": "Amreen Fathima", "email": "amreen@xyz.com", "role": "Data Scientist", "department": "Analytics"},
-            {"id": 3, "full_name": "B Shireesha", "email": "shireesha@xyz.com", "role": "HR Manager", "department": "Human Resources"}
-        ]
+def get_employees(org_id: Optional[int] = Query(None), db: Session = Depends(get_db)):
+    """Organization Admin / Cogniva Admin: List employees with real operational metrics"""
+    from app.models.search_history import SearchHistory
+    from app.models.document import Document as DocModel
+
+    query = db.query(User)
+    if org_id is not None:
+        query = query.filter(User.org_id == org_id)
+
+    users = query.all()
     results = []
     for u in users:
+        # Real query history count
+        user_queries = db.query(SearchHistory).filter(
+            (SearchHistory.user_id == str(u.id)) | (SearchHistory.user_id == u.email)
+        ).all()
+        query_count = len(user_queries)
+
+        # Real documents count
+        doc_count = db.query(DocModel).filter(
+            (DocModel.uploaded_by == u.full_name) | (DocModel.uploaded_by == u.email)
+        ).count()
+
+        # Real last active time
+        last_active = "Never"
+        if user_queries:
+            latest_search = max((q.search_time for q in user_queries if q.search_time), default=None)
+            if latest_search:
+                last_active = latest_search.strftime("%Y-%m-%d %H:%M")
+        elif u.created_at:
+            last_active = u.created_at.strftime("%Y-%m-%d %H:%M")
+
+        engagement_hours = round(max(0.5 if (query_count or doc_count) else 0.0, (query_count * 0.2) + (doc_count * 0.5)), 1)
+
         results.append({
             "id": u.id, 
             "full_name": u.full_name, 
             "email": u.email, 
             "role": u.role, 
             "department": u.department,
-            "queries_processed": 0,
-            "system_engagement": 0,
-            "last_active": "Never"
+            "user_type": getattr(u, "user_type", "employee"),
+            "org_id": getattr(u, "org_id", None),
+            "queries_processed": query_count,
+            "documents_uploaded": doc_count,
+            "system_engagement": engagement_hours,
+            "last_active": last_active
         })
     return results
 

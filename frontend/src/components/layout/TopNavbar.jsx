@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Bell, Building2, ChevronDown, User, ShieldCheck } from 'lucide-react';
+import { API_BASE_URL } from '../../services/api';
 
 export default function TopNavbar({ activeWorkspace, setActiveWorkspace }) {
   const [profile, setProfile] = useState({
-    name: 'Akash M',
-    role: 'Product Manager'
+    name: 'Loading...',
+    role: 'Employee',
+    profilePicture: ''
   });
   
   const [notifications, setNotifications] = useState([]);
@@ -13,23 +15,34 @@ export default function TopNavbar({ activeWorkspace, setActiveWorkspace }) {
 
   const loadProfile = () => {
     try {
-      const saved = localStorage.getItem('cogniva_employee_profile');
-      if (saved) {
-        setProfile(JSON.parse(saved));
+      const savedUser = localStorage.getItem('cogniva_user');
+      const currentUser = savedUser ? JSON.parse(savedUser) : null;
+      const userKey = currentUser?.id ? `cogniva_profile_${currentUser.id}` : 'cogniva_employee_profile';
+      const savedProfile = localStorage.getItem(userKey);
+      
+      let finalProfile = {};
+      if (savedProfile) {
+        finalProfile = JSON.parse(savedProfile);
       }
-    } catch (e) {}
+      
+      setProfile({
+        name: finalProfile.name || currentUser?.full_name || 'Enterprise User',
+        role: finalProfile.role || currentUser?.role || (currentUser?.user_type === 'cogniva_admin' ? 'Master System Admin' : (currentUser?.user_type === 'org_admin' ? 'Organization Admin' : 'Employee')),
+        profilePicture: finalProfile.profilePicture || currentUser?.profilePicture || '',
+        department: finalProfile.department || currentUser?.department || 'General'
+      });
+    } catch (e) {
+      console.error("TopNavbar loadProfile error:", e);
+    }
   };
 
   const fetchNotifications = async () => {
     try {
-      const saved = localStorage.getItem('cogniva_employee_profile');
-      let userId = "EMP-2026-8942";
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.employeeId) userId = parsed.employeeId;
-      }
+      const savedUser = localStorage.getItem('cogniva_user');
+      const currentUser = savedUser ? JSON.parse(savedUser) : null;
+      let userId = currentUser?.id ? String(currentUser.id) : (currentUser?.email || "EMP-2026-8942");
       
-      const res = await fetch(`http://localhost:8000/notifications?user_id=${userId}`);
+      const res = await fetch(`${API_BASE_URL}/notifications?user_id=${encodeURIComponent(userId)}`);
       if (res.ok) {
         const data = await res.json();
         setNotifications(data);
@@ -64,7 +77,7 @@ export default function TopNavbar({ activeWorkspace, setActiveWorkspace }) {
 
   const markAsRead = async (id) => {
     try {
-      await fetch(`http://localhost:8000/notifications/${id}/read`, { method: 'POST' });
+      await fetch(`${API_BASE_URL}/notifications/${id}/read`, { method: 'POST' });
       // update state optimistically
       setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: true } : n));
     } catch (e) {}

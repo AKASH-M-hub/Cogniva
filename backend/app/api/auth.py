@@ -40,6 +40,8 @@ def register_org(req: OrgRegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/register/cogniva-admin")
 def register_cogniva_admin(req: CognivaAdminRegisterRequest, db: Session = Depends(get_db)):
+    if len(req.admin_password) < 8:
+        return {"success": False, "message": "Admin password must be at least 8 characters long"}
     if db.query(User).filter(User.email == req.admin_email).first():
         return {"success": False, "message": "Admin email already registered"}
     admin_user = User(

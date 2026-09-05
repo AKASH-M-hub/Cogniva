@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form, Query
 from fastapi.responses import FileResponse, Response, HTMLResponse
 from typing import Optional
 from pydantic import BaseModel
@@ -52,16 +52,36 @@ async def n8n_proxy(file: UploadFile = File(...), user_email: str = Form("defaul
         raise HTTPException(status_code=500, detail=f"n8n proxy error: {str(e)}")
 
 
-
 @router.post("/")
 def upload_document(
     file: UploadFile = File(...),
+    uploaded_by: Optional[str] = Form(None),
+    department: Optional[str] = Form(None),
+    user_email: Optional[str] = Form(None),
+    org_id: Optional[int] = Form(None),
+    user_id: Optional[int] = Form(None),
     db: Session = Depends(get_db)
 ):
-    """Uploads document (PDF, TXT, DOCX), stores metadata in PostgreSQL and vector embeddings in ChromaDB."""
+    """Uploads document (PDF, TXT, DOCX), stores multi-tenant metadata in PostgreSQL and vector embeddings in ChromaDB."""
     try:
         from app.models.document import Document as DocModel, DocumentChunk as ChunkModel
+        from app.models.user import User
+        from sqlalchemy.sql import func
         
+        # Resolve user_id and org_id automatically if not explicitly provided
+        effective_org_id = org_id
+        effective_user_id = user_id
+        lookup_email = (user_email or "").strip().lower()
+        if lookup_email:
+            user_rec = db.query(User).filter(func.lower(User.email) == lookup_email).first()
+            if user_rec:
+                if effective_org_id is None:
+                    effective_org_id = user_rec.org_id
+                if effective_user_id is None:
+                    effective_user_id = user_rec.id
+                if not uploaded_by:
+                    uploaded_by = user_rec.full_name or user_rec.email
+
         timestamp_prefix = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         original_filename = file.filename
         file.filename = f"{timestamp_prefix}_{file.filename}"
@@ -69,15 +89,18 @@ def upload_document(
         file_path = save_pdf(file)
         extracted_text = extract_text(file_path)
         
-        # Analyze if this file is already perfectly present in the DB
-        existing_docs = db.query(DocModel).filter(DocModel.file_size == len(extracted_text)).all()
+        # Analyze if this file is already perfectly present in this organization
+        existing_query = db.query(DocModel).filter(DocModel.file_size == len(extracted_text))
+        if effective_org_id is not None:
+            existing_query = existing_query.filter(DocModel.org_id == effective_org_id)
+        existing_docs = existing_query.all()
         for doc in existing_docs:
             if doc.filename.endswith(f"_{original_filename}") or doc.filename == original_filename:
                 if os.path.exists(file_path):
                     os.remove(file_path)
                 raise HTTPException(
                     status_code=409, 
-                    detail=f"Analysis Complete: The file '{original_filename}' is already present in the Database. It needs not to be uploaded again."
+                    detail=f"Analysis Complete: The file '{original_filename}' is already present in your Organization Knowledge Hub."
                 )
 
         if not extracted_text.strip():
@@ -87,6 +110,8 @@ def upload_document(
 
         # 1. Save Document metadata in PostgreSQL (cogniva_db)
         doc_id = None
+        uploader_name = uploaded_by or user_email or "Enterprise Employee"
+        dept_name = department or ("Engineering" if "spec" in file.filename.lower() or "contract" in file.filename.lower() else "General")
         try:
             ext = file.filename.split('.')[-1].lower() if '.' in file.filename else 'pdf'
             doc_record = DocModel(
@@ -94,10 +119,12 @@ def upload_document(
                 file_type=ext.upper(),
                 file_path=file_path,
                 file_size=len(extracted_text),
-                uploaded_by="Employee",
+                uploaded_by=uploader_name,
                 total_chunks=len(chunks),
                 status="Indexed in PostgreSQL & ChromaDB",
-                department="Engineering" if "spec" in file.filename.lower() or "contract" in file.filename.lower() else "General"
+                department=dept_name,
+                org_id=effective_org_id,
+                user_id=effective_user_id
             )
             db.add(doc_record)
             db.commit()
@@ -120,77 +147,75 @@ def upload_document(
             db.rollback()
             print(f"PostgreSQL Document Metadata Save Notice: {db_err}")
 
-        # 2. Store Vector Embeddings in ChromaDB Persistent Client
+        # 2. Store Vector Embeddings in ChromaDB Persistent Client with Multi-Tenant metadata
         now_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         stored_chunks = store_embeddings(
             filename=file.filename,
             chunks=chunks,
-            department="Engineering" if "spec" in file.filename.lower() or "contract" in file.filename.lower() else "General",
+            department=dept_name,
             document_id=doc_id,
             category="PDF/DOCX Document",
-            timestamp=now_ts
+            timestamp=now_ts,
+            org_id=effective_org_id,
+            user_id=effective_user_id
         )
 
         return {
             "success": True,
             "filename": file.filename,
             "document_id": doc_id,
+            "org_id": effective_org_id,
+            "user_id": effective_user_id,
             "characters": len(extracted_text),
             "chunks": stored_chunks,
             "collection": "knowledge_base",
             "message": "Document & Chunks Metadata Saved to PostgreSQL DB & ChromaDB Vector Store"
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Document upload error: {str(e)}")
 
 
-@router.post("/text")
-async def add_knowledge_text(
+@router.post("/knowledge-text")
+def upload_knowledge_text(
     request: KnowledgeTextRequest,
     db: Session = Depends(get_db)
 ):
     """Indexes structured text knowledge into PostgreSQL (memory_vault) AND ChromaDB vector store."""
     try:
-        # 1. Save to PostgreSQL database (pgAdmin accessible)
+        # 1. Save structured record in PostgreSQL memory table
+        db_id = None
         try:
             from app.models.memory import Memory
-            memory_record = Memory(
-                department=request.department or "Engineering",
+            new_mem = Memory(
                 title=request.title,
                 decision=request.description,
-                reason=request.reason or request.category or "Knowledge Memory Entry",
-                priority=request.priority or "Medium"
+                reason=request.category,
+                department=request.department or "Engineering",
+                priority="Medium"
             )
-            db.add(memory_record)
+            db.add(new_mem)
             db.commit()
-            db.refresh(memory_record)
-            db_id = memory_record.id
+            db.refresh(new_mem)
+            db_id = new_mem.id
         except Exception as db_err:
             db.rollback()
-            db_id = "temp_id"
-            print(f"PostgreSQL storage notice: {db_err}")
+            print(f"PostgreSQL memory table insert note: {db_err}")
 
         # 2. Save vector embeddings into ChromaDB vector store
-        combined_text = (
-            f"KNOWLEDGE TITLE: {request.title}\n"
-            f"DEPARTMENT: {request.department}\n"
-            f"CATEGORY: {request.category}\n"
-            f"PRIORITY: {request.priority}\n"
-            f"TAGS: {request.tags}\n"
-            f"DESCRIPTION: {request.description}\n"
-            f"REASON / CONTEXT: {request.reason}"
-        )
-        
+        chunks = chunk_text(request.description)
+        if not chunks:
+            chunks = [request.description]
+
+        virtual_filename = f"knowledge_{request.title.lower().replace(' ', '_')[:30]}.txt"
         now_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-        timestamp_suffix = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        virtual_filename = f"{request.department}_{request.title.replace(' ', '_')}_{timestamp_suffix}.txt"
-        
-        chunks = chunk_text(combined_text)
         stored_chunks = store_embeddings(
             filename=virtual_filename,
             chunks=chunks,
             department=request.department or "Engineering",
-            category=request.category or "Structured Knowledge",
+            document_id=db_id,
+            category=request.category or "Organizational Decision",
             timestamp=now_ts
         )
 
@@ -202,62 +227,127 @@ async def add_knowledge_text(
             "chunks": stored_chunks,
             "message": "Organizational Memory Saved to PostgreSQL DB & Vector Store"
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Knowledge entry error: {str(e)}")
 
 
 @router.get("/history")
-def get_upload_history(db: Session = Depends(get_db)):
-    """Returns categorized history of all uploaded documents and indexed memories."""
+def get_upload_history(
+    user_id: Optional[str] = Query(None),
+    scope: Optional[str] = Query("all"),
+    org_id: Optional[int] = Query(None),
+    user_type: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Returns categorized history of documents and memories scoped to organization and user permissions."""
     history = []
     uploads_dir = "uploads"
+    seen_filenames = set()
 
-    # 1. Scan physical uploads directory
-    if os.path.exists(uploads_dir):
-        for fname in os.listdir(uploads_dir):
-            fpath = os.path.join(uploads_dir, fname)
-            if os.path.isfile(fpath):
-                stat = os.stat(fpath)
-                ext = os.path.splitext(fname)[1].lower()
-                ftype = "PDF Document" if ext == ".pdf" else "DOCX Document" if ext in [".docx", ".doc"] else "Presentation" if ext in [".ppt", ".pptx"] else "Text Document"
-                
-                # Fast content metadata summary without blocking pdfminer parsing
-                full_content = f"Document File: {fname}\nType: {ftype}\nSize: {(stat.st_size / 1024):.1f} KB\nStatus: Vector Indexed in ChromaDB."
-                if ext in [".txt", ".md", ".json"]:
-                    try:
-                        with open(fpath, "r", encoding="utf-8", errors="ignore") as tf:
-                            full_content = tf.read(1000)
-                    except Exception:
-                        pass
+    from app.models.document import Document as DocModel
+    from app.models.user import User
+    from sqlalchemy.sql import func
 
-                if not full_content or not full_content.strip():
-                    full_content = f"Document File: {fname}\nUploaded and indexed in ChromaDB vector store."
+    # Determine effective org_id and user information
+    effective_org_id = org_id
+    resolved_user = None
+    if user_id:
+        clean_uid = str(user_id).strip().lower()
+        if clean_uid.isdigit():
+            resolved_user = db.query(User).filter(User.id == int(clean_uid)).first()
+        else:
+            resolved_user = db.query(User).filter(func.lower(User.email) == clean_uid).first()
+        if resolved_user:
+            if effective_org_id is None:
+                effective_org_id = resolved_user.org_id
+            if not user_type:
+                user_type = getattr(resolved_user, "user_type", "employee")
 
-                lname = fname.lower()
-                category = "Architecture Spec" if any(k in lname for k in ["srs", "spec", "arch", "contract"]) else "SOP" if any(k in lname for k in ["array", "sorting", "searching", "sop", "dsa"]) else "Decision" if "memory" in lname else "General Document"
-                
-                history.append({
-                    "id": f"file_{fname}",
-                    "name": fname,
-                    "type": ftype,
-                    "extension": ext,
-                    "category": category,
-                    "department": "Engineering" if any(k in lname for k in ["srs", "contract", "dsa", "sorting", "searching"]) else "HR" if "hr" in lname else "General",
-                    "size_bytes": stat.st_size,
-                    "size_formatted": f"{(stat.st_size / 1024):.1f} KB" if stat.st_size < 1048576 else f"{(stat.st_size / 1048576):.2f} MB",
-                    "timestamp": datetime.datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M"),
-                    "status": "Vector Indexed in ChromaDB",
-                    "source": "Physical Upload",
-                    "priority": "High" if "srs" in lname or "contract" in lname else "Medium",
-                    "description": full_content,
-                    "content": full_content
-                })
+    # 1. Query PostgreSQL Document table with Multi-Tenant Filtering
+    try:
+        query = db.query(DocModel)
+        # Multi-Tenant Isolation: strictly isolate data by organization
+        if user_type != "cogniva_admin":
+            if effective_org_id is not None:
+                query = query.filter((DocModel.org_id == effective_org_id) | (DocModel.org_id.is_(None)))
+            else:
+                query = query.filter(DocModel.org_id.is_(None))
+
+        db_docs = query.order_by(DocModel.upload_date.desc()).all()
+    except Exception as e:
+        print(f"Document table query notice: {e}")
+        db_docs = []
+
+    # Process documents: colleagues within the same org see all org docs
+    for doc in db_docs:
+        uploader = doc.uploaded_by if doc.uploaded_by else "Enterprise Employee"
+        
+        # Check ownership and admin permissions
+        is_super_admin = (user_type == "cogniva_admin")
+        is_org_admin = (user_type == "org_admin" and (effective_org_id is None or doc.org_id is None or doc.org_id == effective_org_id))
+        
+        is_uploader = False
+        if resolved_user:
+            if doc.user_id and doc.user_id == resolved_user.id:
+                is_uploader = True
+            elif resolved_user.email and doc.uploaded_by and (resolved_user.email.lower() in doc.uploaded_by.lower() or doc.uploaded_by.lower() in resolved_user.email.lower()):
+                is_uploader = True
+            elif resolved_user.full_name and doc.uploaded_by and resolved_user.full_name.lower() in doc.uploaded_by.lower():
+                is_uploader = True
+        elif user_id:
+            clean_u = str(user_id).strip().lower()
+            if doc.user_id and str(doc.user_id) == clean_u:
+                is_uploader = True
+            elif uploader and (clean_u in uploader.lower() or uploader.lower() in clean_u):
+                is_uploader = True
+
+        # Scope filter:
+        # 'mine' -> only documents uploaded by this specific user
+        # 'all'  -> all shared organization documents visible to all colleagues!
+        if scope == "mine" and not (is_uploader or is_super_admin):
+            continue
+
+        can_delete = is_super_admin or is_org_admin or is_uploader
+
+        ext = f".{doc.file_type.lower()}" if doc.file_type else ".pdf"
+        ftype = f"{doc.file_type} Document" if doc.file_type else "PDF Document"
+        size = doc.file_size or 1024
+        ts = doc.upload_date.strftime("%Y-%m-%d %H:%M") if doc.upload_date else datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        
+        seen_filenames.add(doc.filename)
+        history.append({
+            "id": f"doc_{doc.id}",
+            "name": doc.filename,
+            "type": ftype,
+            "extension": ext,
+            "category": "Architecture Spec" if any(k in doc.filename.lower() for k in ["srs", "spec", "arch", "contract"]) else "General Document",
+            "department": doc.department or "General",
+            "uploaded_by": uploader,
+            "user_id": doc.user_id,
+            "org_id": doc.org_id,
+            "can_delete": can_delete,
+            "is_owner": is_uploader,
+            "chunks": doc.total_chunks or 1,
+            "size_bytes": size,
+            "size_formatted": f"{(size / 1024):.1f} KB" if size < 1048576 else f"{(size / 1048576):.2f} MB",
+            "timestamp": ts,
+            "status": doc.status or "Vector Indexed in ChromaDB",
+            "source": "Knowledge Hub Ingestion",
+            "priority": "High" if "srs" in doc.filename.lower() or "contract" in doc.filename.lower() else "Medium",
+            "description": f"Document: {doc.filename}\nIndexed in Knowledge Hub.",
+            "content": f"Document: {doc.filename}\nIndexed in Knowledge Hub."
+        })
 
     # 2. Query PostgreSQL Memory table for structured memories
     try:
         from app.models.memory import Memory
         memories = db.query(Memory).order_by(Memory.id.desc()).all()
         for mem in memories:
+            if scope == "mine" and not is_super_admin:
+                continue
+
             history.append({
                 "id": f"mem_{mem.id}",
                 "name": mem.title,
@@ -265,6 +355,10 @@ def get_upload_history(db: Session = Depends(get_db)):
                 "extension": ".txt",
                 "category": mem.reason if mem.reason and len(mem.reason) < 30 else "Decision Memory",
                 "department": mem.department or "Engineering",
+                "uploaded_by": "Enterprise Memory Vault",
+                "can_delete": user_type in ["cogniva_admin", "org_admin"],
+                "is_owner": False,
+                "chunks": 1,
                 "size_bytes": len(mem.decision or ""),
                 "size_formatted": f"{len(mem.decision or '')} chars",
                 "timestamp": mem.created_at.strftime("%Y-%m-%d %H:%M") if hasattr(mem, 'created_at') and mem.created_at else datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -285,85 +379,183 @@ def get_upload_history(db: Session = Depends(get_db)):
 
 
 @router.delete("/clear-all")
-def clear_all_data(db: Session = Depends(get_db)):
-    """Deletes all uploaded physical files, ChromaDB vector embeddings, and PostgreSQL records."""
+def clear_all_data(
+    user_type: Optional[str] = Query(None),
+    org_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Deletes uploaded physical files, ChromaDB vectors, and records with role-based restrictions."""
+    # 1. Employees cannot clear all organization data
+    if user_type == "employee":
+        raise HTTPException(
+            status_code=403,
+            detail="Permission Denied: Regular employees cannot wipe organization data. Only Organization Admins can perform this action."
+        )
+
     import shutil
     from app.models.document import Document, DocumentChunk
+    from clear_all_data import execute_data_wipe
 
-    # 1. Clear physical uploads
-    uploads_dir = "uploads"
-    deleted_files_count = 0
-    if os.path.exists(uploads_dir):
-        for fname in os.listdir(uploads_dir):
-            fpath = os.path.join(uploads_dir, fname)
-            try:
-                if os.path.isfile(fpath) or os.path.islink(fpath):
-                    os.unlink(fpath)
-                    deleted_files_count += 1
-                elif os.path.isdir(fpath):
-                    shutil.rmtree(fpath)
-                    deleted_files_count += 1
-            except Exception:
-                pass
+    # If cogniva_admin or full maintenance, run comprehensive clean
+    if user_type == "cogniva_admin" or org_id is None:
+        result = execute_data_wipe()
+        return {
+            "success": True,
+            "message": "All data cleared successfully across the platform!",
+            "deleted_files": result.get("deleted_files", 0),
+            "deleted_vectors": result.get("deleted_vectors", 0)
+        }
 
-    # 2. Clear ChromaDB vector collection
+    # If org_admin, only delete documents and vectors belonging to their org_id
+    deleted_docs_count = 0
     deleted_vectors_count = 0
     try:
         from app.services.vector_service import collection
-        data = collection.get()
-        if data and "ids" in data and len(data["ids"]) > 0:
-            deleted_vectors_count = len(data["ids"])
-            collection.delete(ids=data["ids"])
-    except Exception:
-        pass
+        org_docs = db.query(Document).filter(Document.org_id == org_id).all()
+        for doc in org_docs:
+            # Remove file
+            if doc.file_path and os.path.exists(doc.file_path):
+                try:
+                    os.remove(doc.file_path)
+                except Exception:
+                    pass
+            # Remove chunks & doc
+            db.query(DocumentChunk).filter(DocumentChunk.document_id == doc.id).delete()
+            db.delete(doc)
+            deleted_docs_count += 1
 
-    # 3. Clear PostgreSQL database tables
-    try:
-        db.query(DocumentChunk).delete()
-        db.query(Document).delete()
+            # Delete matching ChromaDB vectors
+            try:
+                chroma_data = collection.get()
+                if chroma_data and "ids" in chroma_data and chroma_data["ids"]:
+                    target_ids = []
+                    for idx, vector_id in enumerate(chroma_data["ids"]):
+                        meta = chroma_data["metadatas"][idx] if "metadatas" in chroma_data and idx < len(chroma_data["metadatas"]) else {}
+                        if meta.get("filename") == doc.filename or str(meta.get("org_id")) == str(org_id):
+                            target_ids.append(vector_id)
+                    if target_ids:
+                        collection.delete(ids=target_ids)
+                        deleted_vectors_count += len(target_ids)
+            except Exception:
+                pass
+        
         db.commit()
     except Exception as e:
         db.rollback()
+        raise HTTPException(status_code=500, detail=f"Org data clear failed: {str(e)}")
 
     return {
         "success": True,
-        "message": "All data cleared successfully!",
-        "deleted_files": deleted_files_count,
+        "message": f"Organization data cleared successfully! ({deleted_docs_count} documents removed)",
+        "deleted_docs": deleted_docs_count,
         "deleted_vectors": deleted_vectors_count
     }
 
 
 @router.delete("/record/{record_id}")
-def delete_single_record(record_id: str, db: Session = Depends(get_db)):
-    """Deletes a specific physical file or memory record and its ChromaDB vector embeddings."""
+def delete_single_record(
+    record_id: str,
+    user_id: Optional[str] = Query(None),
+    user_email: Optional[str] = Query(None),
+    user_type: Optional[str] = Query(None),
+    org_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Deletes a specific document or memory record with strict multi-tenant ownership validation."""
     try:
         from app.services.vector_service import collection
         from app.models.memory import Memory
         from app.models.document import Document, DocumentChunk
+        from app.models.user import User
+        from sqlalchemy.sql import func
 
-        filename = record_id
-        if record_id.startswith("file_"):
-            filename = record_id[5:]
+        # Resolve user info if not passed directly
+        resolved_user = None
+        if user_id:
+            clean_uid = str(user_id).strip().lower()
+            if clean_uid.isdigit():
+                resolved_user = db.query(User).filter(User.id == int(clean_uid)).first()
+            else:
+                resolved_user = db.query(User).filter(func.lower(User.email) == clean_uid).first()
+            if resolved_user and not user_type:
+                user_type = getattr(resolved_user, "user_type", "employee")
+            if resolved_user and org_id is None:
+                org_id = resolved_user.org_id
 
-        # 1. Delete memory record if structured memory
+        # 1. Check if deleting a structured memory
         if record_id.startswith("mem_"):
             try:
                 mem_id = int(record_id[4:])
+                if user_type not in ["cogniva_admin", "org_admin"]:
+                    raise HTTPException(status_code=403, detail="Permission Denied: Only Admins can remove structured organization memories.")
                 db.query(Memory).filter(Memory.id == mem_id).delete()
                 db.commit()
+                return {"success": True, "message": f"Memory record '{record_id}' deleted successfully."}
+            except HTTPException:
+                raise
             except Exception as e:
                 db.rollback()
+                raise HTTPException(status_code=500, detail=f"Memory delete error: {str(e)}")
 
-        # 2. Delete physical upload file
+        # 2. Check document in database
+        target_doc = None
+        filename = record_id
+        if record_id.startswith("doc_"):
+            try:
+                doc_id_val = int(record_id[4:])
+                target_doc = db.query(Document).filter(Document.id == doc_id_val).first()
+                if target_doc:
+                    filename = target_doc.filename
+            except Exception:
+                pass
+        elif record_id.startswith("file_"):
+            filename = record_id[5:]
+            target_doc = db.query(Document).filter(Document.filename == filename).first()
+        else:
+            target_doc = db.query(Document).filter(Document.filename == filename).first()
+
+        # If document exists, enforce multi-tenant and ownership permissions
+        if target_doc:
+            # Multi-Tenant check
+            if user_type != "cogniva_admin" and target_doc.org_id is not None and org_id is not None:
+                if int(target_doc.org_id) != int(org_id):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Permission Denied: Cross-organization document deletion is prohibited."
+                    )
+
+            # Ownership check
+            is_super_admin = (user_type == "cogniva_admin")
+            is_org_admin = (user_type == "org_admin")
+            is_owner = False
+
+            clean_email = (user_email or (resolved_user.email if resolved_user else "")).strip().lower()
+            clean_uid = str(user_id or (resolved_user.id if resolved_user else "")).strip().lower()
+            doc_uploader = (target_doc.uploaded_by or "").strip().lower()
+
+            if target_doc.user_id and clean_uid and str(target_doc.user_id) == clean_uid:
+                is_owner = True
+            elif clean_email and (clean_email in doc_uploader or doc_uploader in clean_email):
+                is_owner = True
+            elif clean_uid and (clean_uid in doc_uploader or doc_uploader in clean_uid):
+                is_owner = True
+
+            if not (is_super_admin or is_org_admin or is_owner):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Permission Denied: You can only remove data you personally uploaded. Common organization data cannot be removed."
+                )
+
+        # Proceed to delete matching physical upload file
         uploads_dir = "uploads"
         fpath = os.path.join(uploads_dir, filename)
         if os.path.exists(fpath) and os.path.isfile(fpath):
             try:
                 os.remove(fpath)
             except Exception as e:
-                print(f"File remove note: {e}")
+                print(f"File remove notice: {e}")
 
-        # 3. Delete matching ChromaDB vectors
+        # Delete matching ChromaDB vectors
         try:
             chroma_data = collection.get()
             if chroma_data and "ids" in chroma_data and chroma_data["ids"]:
@@ -377,21 +569,35 @@ def delete_single_record(record_id: str, db: Session = Depends(get_db)):
                 if target_ids:
                     collection.delete(ids=target_ids)
         except Exception as ve:
-            print(f"Chroma delete vector note: {ve}")
+            print(f"Chroma delete vector notice: {ve}")
 
-        # 4. Delete PostgreSQL document records
-        try:
-            docs = db.query(Document).filter(Document.filename == filename).all()
-            for doc in docs:
-                db.query(DocumentChunk).filter(DocumentChunk.document_id == doc.id).delete()
-                db.delete(doc)
-            db.commit()
-        except Exception as de:
-            db.rollback()
+        # Delete PostgreSQL document records
+        if target_doc:
+            try:
+                db.query(DocumentChunk).filter(DocumentChunk.document_id == target_doc.id).delete()
+                db.delete(target_doc)
+                db.commit()
+            except Exception as de:
+                db.rollback()
+                print(f"DB delete doc notice: {de}")
 
-        return {"success": True, "message": f"Record '{filename}' deleted successfully."}
+        return {"success": True, "message": f"Document '{filename}' deleted successfully."}
+    except HTTPException:
+        raise
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+
+@router.post("/wipe-all-now")
+def wipe_all_now(db: Session = Depends(get_db)):
+    """Immediate Clean Wipe endpoint to remove all currently existing parsed documents, chunks, and vectors."""
+    from clear_all_data import execute_data_wipe
+    res = execute_data_wipe()
+    return {
+        "success": True,
+        "message": "All existing parsed data, documents, and vector store successfully wiped!",
+        "result": res
+    }
 
 
 @router.delete("/chroma/{vector_id}")

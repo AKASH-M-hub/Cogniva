@@ -15,15 +15,27 @@ import {
 export default function SettingsWorkspace() {
   const [profile, setProfile] = useState(() => {
     try {
-      const saved = localStorage.getItem('cogniva_employee_profile');
+      const savedUser = localStorage.getItem('cogniva_user');
+      const currentUser = savedUser ? JSON.parse(savedUser) : null;
+      const userKey = currentUser?.id ? `cogniva_profile_${currentUser.id}` : 'cogniva_employee_profile';
+      const saved = localStorage.getItem(userKey);
       if (saved) return JSON.parse(saved);
-    } catch (e) { }
+
+      return {
+        name: currentUser?.full_name || 'Enterprise User',
+        role: currentUser?.role || (currentUser?.user_type === 'cogniva_admin' ? 'Master System Admin' : (currentUser?.user_type === 'org_admin' ? 'Organization Admin' : 'Enterprise Employee')),
+        department: currentUser?.department || 'Engineering & Product',
+        employeeId: currentUser?.id ? `EMP-2026-${String(currentUser.id).padStart(4, '0')}` : 'EMP-2026-0001',
+        email: currentUser?.email || 'user@cogniva.ai',
+        profilePicture: '',
+      };
+    } catch (e) {}
     return {
-      name: 'Akash M',
-      role: 'Product Manager / Enterprise Analyst',
+      name: 'Enterprise User',
+      role: 'Enterprise Employee',
       department: 'Engineering & Product',
-      employeeId: 'EMP-2026-8942',
-      email: 'akash.m@cogniva.ai',
+      employeeId: 'EMP-2026-0001',
+      email: 'user@cogniva.ai',
       profilePicture: '',
     };
   });
@@ -42,7 +54,7 @@ export default function SettingsWorkspace() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setProfile({ ...profile, profilePicture: reader.result });
+        setProfile((prev) => ({ ...prev, profilePicture: reader.result }));
       };
       reader.readAsDataURL(file);
     }
@@ -51,7 +63,20 @@ export default function SettingsWorkspace() {
   const handleSave = (e) => {
     if (e) e.preventDefault();
     try {
-      localStorage.setItem('cogniva_employee_profile', JSON.stringify(profile));
+      const savedUser = localStorage.getItem('cogniva_user');
+      const currentUser = savedUser ? JSON.parse(savedUser) : null;
+      const userKey = currentUser?.id ? `cogniva_profile_${currentUser.id}` : 'cogniva_employee_profile';
+      localStorage.setItem(userKey, JSON.stringify(profile));
+
+      // Also update currentUser in localStorage so role and full_name stay synced
+      if (currentUser) {
+        currentUser.full_name = profile.name;
+        currentUser.role = profile.role;
+        currentUser.department = profile.department;
+        currentUser.profilePicture = profile.profilePicture;
+        localStorage.setItem('cogniva_user', JSON.stringify(currentUser));
+      }
+
       window.dispatchEvent(new Event('profileUpdated'));
       setSavedNotice(true);
       setTimeout(() => setSavedNotice(false), 3000);

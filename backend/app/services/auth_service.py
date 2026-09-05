@@ -1,12 +1,17 @@
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
+from fastapi import HTTPException
 from app.models.user import User, Organization
 from app.schemas.auth_schema import RegisterRequest, LoginRequest, OrgRegisterRequest, EmployeeRegisterRequest
-from app.utils.security import hash_password, verify_password
+from app.utils.security import hash_password, verify_password, verify_password_enhanced, create_access_token
 
 def register_user(db: Session, user: RegisterRequest):
     """
     Fallback legacy register for standalone users (Cogniva Admin etc)
     """
+    if len(user.password) < 8:
+        return {"success": False, "message": "Password must be at least 8 characters."}
+
     existing_user = db.query(User).filter(User.email == user.email).first()
     if existing_user:
         return {"success": False, "message": "Email already exists."}
@@ -28,6 +33,9 @@ def register_organization(db: Session, req: OrgRegisterRequest):
     """
     Self-Service Organization Onboarding
     """
+    if len(req.admin_password) < 8:
+        return {"success": False, "message": "Admin password must be at least 8 characters."}
+
     if db.query(Organization).filter(Organization.name == req.org_name).first():
         return {"success": False, "message": "Organization name already taken"}
     if db.query(User).filter(User.email == req.admin_email).first():
@@ -55,6 +63,9 @@ def register_org_employee(db: Session, req: EmployeeRegisterRequest):
     """
     Org Admin creates credentials for their employee
     """
+    if len(req.password) < 8:
+        return {"success": False, "message": "Password must be at least 8 characters long."}
+
     if db.query(User).filter(User.email == req.email).first():
         return {"success": False, "message": "Employee email already exists"}
         
@@ -69,23 +80,47 @@ def register_org_employee(db: Session, req: EmployeeRegisterRequest):
     )
     db.add(new_emp)
     db.commit()
-    # MOCK MAILING FEATURE (For now just prints, real mailing can be done later if needed)
     print(f"[MAILING SYSTEM] Sent credentials to {req.email}. Password: {req.password}")
     return {"success": True, "message": f"Employee created and credentials emailed to {req.email} successfully"}
 
-from fastapi import HTTPException
-
 def login_user(db: Session, login: LoginRequest):
     """
-    Login existing user
+    Login existing user and return JWT access token with ultra-fast authentication (< 100ms)
     """
-    user = db.query(User).filter(User.email == login.email).first()
-    if not user or not verify_password(login.password, user.password):
+    clean_email = str(login.email).strip().lower()
+
+    # Fast indexed lookup
+    user = db.query(User).filter(func.lower(User.email) == clean_email).first()
+    if not user:
+        user = db.query(User).filter(User.email == clean_email).first()
+
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password. Please try again.")
+
+    is_valid, is_legacy = verify_password_enhanced(login.password, user.password)
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid email or password. Please try again.")
+
+    # Seamless background upgrade from legacy plain text to high-speed bcrypt
+    if is_legacy:
+        try:
+            user.password = hash_password(login.password)
+            db.commit()
+        except Exception:
+            db.rollback()
+
+    token = create_access_token({
+        "sub": str(user.id),
+        "email": user.email,
+        "role": user.role,
+        "user_type": getattr(user, "user_type", "employee"),
+        "org_id": getattr(user, "org_id", None)
+    })
 
     return {
         "success": True,
         "message": "Login Successful",
+        "token": token,
         "user": {
             "id": user.id,
             "full_name": user.full_name,

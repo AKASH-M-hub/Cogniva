@@ -105,6 +105,7 @@ export default function Sidebar({ activeWorkspace, setActiveWorkspace, sessionUs
         <button
            onClick={() => {
              localStorage.removeItem('cogniva_user');
+             localStorage.removeItem('cogniva_token');
              window.location.reload();
            }}
            className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-600 hover:text-rose-600 font-bold rounded-xl text-xs transition-all cursor-pointer"

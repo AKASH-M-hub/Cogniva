@@ -83,6 +83,9 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
   // Delete Confirmation Modal State
   const [deleteDialog, setDeleteDialog] = useState(null);
 
+  const currentUser = JSON.parse(localStorage.getItem('cogniva_user') || '{}');
+  const userId = currentUser?.id ? String(currentUser.id) : (currentUser?.email || 'emp_101');
+
   useEffect(() => {
     fetchSearchHistory();
   }, []);
@@ -90,7 +93,7 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
   const fetchSearchHistory = async () => {
     setHistoryLoading(true);
     try {
-      const res = await searchAgentAPI.getHistory();
+      const res = await searchAgentAPI.getHistory(userId);
       if (res && res.history) {
         setSearchHistory(res.history);
         setTotalHistoryCount(res.total_count !== undefined ? res.total_count : res.history.length);
@@ -123,7 +126,7 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
     if (!deleteDialog) return;
     try {
       if (deleteDialog.action === 'clearAll') {
-        await searchAgentAPI.clearHistory();
+        await searchAgentAPI.clearHistory(userId);
         setSearchHistory([]);
         setTotalHistoryCount(0);
       } else if (deleteDialog.action === 'single') {
@@ -155,6 +158,8 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
         query: q,
         department: departmentFilter === 'all' ? null : departmentFilter,
         file_type: fileTypeFilter === 'all' ? null : fileTypeFilter,
+        user_id: userId,
+        user_role: currentUser?.role || 'user',
         top_k: 5,
         record_history: !isHistoryView
       };

@@ -17,11 +17,11 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    full_name = Column(String(100), nullable=False, default="Akash M")
-    email = Column(String(150), unique=True, nullable=False, default="akash.m@cogniva.ai")
-    password = Column(String(255), nullable=True, default="hashed_password")
-    role = Column(String(100), default="Product Manager / Enterprise Analyst")
-    department = Column(String(100), default="Engineering & Product")
+    full_name = Column(String(100), nullable=False, default="Enterprise Employee")
+    email = Column(String(150), unique=True, index=True, nullable=False)
+    password = Column(String(255), nullable=True)
+    role = Column(String(100), default="Enterprise Employee")
+    department = Column(String(100), default="General")
     
     # New Auth Fields
     user_type = Column(String(50), default="employee") # employee, org_admin, cogniva_admin

@@ -26,9 +26,11 @@ import {
   Clock,
   Timer,
   Info,
-  TriangleAlert
+  TriangleAlert,
+  Lock,
+  Building2
 } from 'lucide-react';
-import { knowledgeHubAPI, adminAPI } from '../../services/api';
+import { knowledgeHubAPI, adminAPI, API_BASE_URL } from '../../services/api';
 
 const getTimeSegment = (timestampStr) => {
   if (!timestampStr) return 'Afternoon / Noon (12:00 PM - 05:00 PM)';
@@ -43,6 +45,7 @@ const getTimeSegment = (timestampStr) => {
 };
 
 export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSearch, onNavigateToResponse }) {
+  const [historyScope, setHistoryScope] = useState('all'); // 'all' or 'mine'
   // Navigation tab state: 'records', 'add', or 'chroma'
   const [activeTab, setActiveTab] = useState('records');
   const [isChromaUnlocked, setIsChromaUnlocked] = useState(false);
@@ -125,10 +128,18 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
     return () => clearInterval(interval);
   }, [loading]);
 
-  const fetchHistory = async () => {
+  const fetchHistory = async (scopeOverride = null) => {
     setHistoryLoading(true);
     try {
-      const res = await knowledgeHubAPI.getHistory();
+      const activeScope = scopeOverride || historyScope;
+      const currentUser = JSON.parse(localStorage.getItem('cogniva_user') || '{}');
+      const uploader = currentUser?.id || currentUser?.email || currentUser?.full_name || '';
+      const res = await knowledgeHubAPI.getHistory(
+        uploader,
+        activeScope,
+        currentUser?.org_id || null,
+        currentUser?.user_type || 'employee'
+      );
       if (res && res.history) {
         setHistoryList(res.history);
       }
@@ -202,10 +213,11 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
   const confirmDeleteAction = async () => {
     if (!deleteDialog) return;
     const { action, item, isVectorStore } = deleteDialog;
+    const currentUser = JSON.parse(localStorage.getItem('cogniva_user') || '{}');
 
     try {
       if (action === 'clearAll') {
-        await knowledgeHubAPI.clearAllData();
+        await knowledgeHubAPI.clearAllData(currentUser?.user_type, currentUser?.org_id);
         await fetchHistory();
         await fetchChromaHistory();
       } else if (action === 'record') {
@@ -215,13 +227,24 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
           setTotalVectors((prev) => Math.max(0, prev - 1));
         } else {
           const recordId = item.id || item.name || item.filename;
-          await knowledgeHubAPI.deleteRecord(recordId);
+          const delRes = await knowledgeHubAPI.deleteRecord(
+            recordId,
+            currentUser?.id,
+            currentUser?.email,
+            currentUser?.user_type,
+            currentUser?.org_id
+          );
+          if (delRes && delRes.success === false) {
+            alert(delRes.message || 'Permission Denied: You can only remove data you personally uploaded.');
+            return;
+          }
           setHistoryList((prev) => prev.filter((rec) => (rec.id !== item.id && rec.name !== item.name)));
           fetchChromaHistory();
         }
       }
     } catch (err) {
       console.error('Delete action error:', err);
+      alert(err.response?.data?.detail || err.response?.data?.message || 'Failed to delete record.');
     } finally {
       setDeleteDialog(null);
     }
@@ -230,17 +253,15 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
   const handleViewOnline = (item) => {
     const fileName = item.name || item.filename;
     if (fileName) {
-      window.open(`http://localhost:8000/upload/file/${fileName}`, '_blank');
+      window.open(`${API_BASE_URL}/upload/file/${fileName}`, '_blank');
     }
   };
 
   const handleDownloadFile = (item) => {
     const fileName = item.name || item.filename;
     if (fileName) {
-      // By using a direct anchor string instead of fetch(), we completely bypass cross-origin JS restrictions.
-      // And the backend's ?download=true will force standard FileResponse headers.
       const link = document.createElement('a');
-      link.href = `http://localhost:8000/upload/file/${fileName}?download=true`;
+      link.href = `${API_BASE_URL}/upload/file/${fileName}?download=true`;
       link.download = fileName; // Enforce download behavior
       document.body.appendChild(link);
       link.click();
@@ -290,10 +311,16 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
     const finalDept = departmentSelect === 'Custom' ? customDepartment || 'General' : departmentSelect;
     const finalCat = categorySelect === 'Custom' ? customCategory || 'General' : categorySelect;
 
+    const currentUser = JSON.parse(localStorage.getItem('cogniva_user') || '{}');
+    const uploaderEmail = currentUser?.email || 'employee@cogniva.ai';
+    const uploaderName = currentUser?.full_name || 'Enterprise Employee';
+    const userOrgId = currentUser?.org_id || null;
+    const userId = currentUser?.id || null;
+
     try {
       if (selectedFiles.length > 0) {
-        // Upload all selected files in parallel
-        await Promise.all(selectedFiles.map(file => knowledgeHubAPI.uploadDocument(file)));
+        // Upload all selected files in parallel with multi-tenant org metadata
+        await Promise.all(selectedFiles.map(file => knowledgeHubAPI.uploadDocument(file, uploaderEmail, uploaderName, finalDept, userOrgId, userId)));
       } else {
         await knowledgeHubAPI.addKnowledgeText({
           title,
@@ -403,6 +430,7 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
           <tr>
             <th className="py-3 px-4">Record Name / Title</th>
             <th className="py-3 px-4">Type</th>
+            <th className="py-3 px-4">Uploader</th>
             <th className="py-3 px-4">Department</th>
             <th className="py-3 px-4">Size / Length</th>
             <th className="py-3 px-4">Accurate Timestamp</th>
@@ -426,9 +454,16 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
                       ) : (
                         <FileText className="w-4 h-4 text-rose-500 shrink-0" />
                       )}
-                      <span className="truncate max-w-[240px]" title={chunkTitle}>
-                        {chunkTitle}
-                      </span>
+                      <div className="truncate max-w-[240px]">
+                        <span className="block truncate font-bold text-slate-900" title={chunkTitle}>
+                          {chunkTitle}
+                        </span>
+                        {!isVectorStore && item.chunks && item.chunks > 1 && (
+                          <span className="text-[10px] font-semibold text-indigo-600 block">
+                            {item.chunks} chunks indexed
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="py-3.5 px-4">
@@ -437,6 +472,11 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
                       : 'bg-rose-50 text-rose-700 border border-rose-200/60'
                       }`}>
                       {chunkTypeDisplay}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                      {item.uploaded_by || 'Enterprise Employee'}
                     </span>
                   </td>
                   <td className="py-3.5 px-4 font-medium text-slate-700">{item.department || 'Engineering'}</td>
@@ -476,14 +516,42 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
                         <span>{isVectorStore ? 'Download Chunk' : 'Download'}</span>
                       </button>
 
-                      <button
-                        onClick={() => handleDeleteRecord(item, isVectorStore)}
-                        className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 rounded-lg text-[11px] font-semibold transition-all cursor-pointer inline-flex items-center space-x-1 shadow-2xs"
-                        title={isVectorStore ? 'Delete ChromaDB vector chunk' : 'Delete document record'}
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                        <span>Delete</span>
-                      </button>
+                      {(() => {
+                        const currentUser = JSON.parse(localStorage.getItem('cogniva_user') || '{}');
+                        const isSuperAdmin = currentUser?.user_type === 'cogniva_admin';
+                        const isOrgAdmin = currentUser?.user_type === 'org_admin';
+                        const isOwner = item.is_owner || 
+                          (item.user_id && currentUser?.id && String(item.user_id) === String(currentUser.id)) ||
+                          (item.uploaded_by && (
+                            item.uploaded_by.toLowerCase() === currentUser?.email?.toLowerCase() ||
+                            item.uploaded_by.toLowerCase() === currentUser?.full_name?.toLowerCase()
+                          ));
+                        const canDeleteItem = item.can_delete !== undefined ? item.can_delete : (isSuperAdmin || isOrgAdmin || isOwner);
+
+                        if (canDeleteItem) {
+                          return (
+                            <button
+                              onClick={() => handleDeleteRecord(item, isVectorStore)}
+                              className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 rounded-lg text-[11px] font-semibold transition-all cursor-pointer inline-flex items-center space-x-1 shadow-2xs"
+                              title={isVectorStore ? 'Delete ChromaDB vector chunk' : 'Delete document record'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Delete</span>
+                            </button>
+                          );
+                        } else {
+                          return (
+                            <button
+                              disabled
+                              className="px-2.5 py-1 bg-slate-50 text-slate-400 border border-slate-200 rounded-lg text-[11px] font-medium cursor-not-allowed inline-flex items-center space-x-1 select-none"
+                              title={`Protected Org Data: Uploaded by ${item.uploaded_by || 'Colleague'}. You can only delete documents you personally uploaded.`}
+                            >
+                              <Lock className="w-3.5 h-3.5 text-slate-400" />
+                              <span>Protected</span>
+                            </button>
+                          );
+                        }
+                      })()}
                     </div>
                   </td>
                 </tr>
@@ -750,19 +818,42 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
                 />
               </div>
 
-              <div className="flex items-center space-x-2 text-xs w-full md:w-auto justify-end">
-                <Building className="w-4 h-4 text-slate-400" />
-                <select
-                  value={recordDepartmentFilter}
-                  onChange={(e) => setRecordDepartmentFilter(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
-                >
-                  <option value="all">All Departments</option>
-                  <option value="engineering">Engineering & Product</option>
-                  <option value="hr">HR & Governance</option>
-                  <option value="finance">Finance & Legal</option>
-                  <option value="general">General Enterprise</option>
-                </select>
+              <div className="flex items-center space-x-3 text-xs w-full md:w-auto justify-end">
+                <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => { setHistoryScope('all'); fetchHistory('all'); }}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                      historyScope === 'all' ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    All Knowledge
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setHistoryScope('mine'); fetchHistory('mine'); }}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                      historyScope === 'mine' ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    My Uploads
+                  </button>
+                </div>
+
+                <div className="flex items-center space-x-1.5">
+                  <Building className="w-4 h-4 text-slate-400" />
+                  <select
+                    value={recordDepartmentFilter}
+                    onChange={(e) => setRecordDepartmentFilter(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
+                  >
+                    <option value="all">All Departments</option>
+                    <option value="engineering">Engineering & Product</option>
+                    <option value="hr">HR & Governance</option>
+                    <option value="finance">Finance & Legal</option>
+                    <option value="general">General Enterprise</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -1063,14 +1154,28 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
                   <span>Re-Scan Vectors</span>
                 </button>
 
-                <button
-                  onClick={handleClearAll}
-                  className="flex-1 sm:flex-none px-4 py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-semibold rounded-xl text-xs transition-all flex items-center justify-center space-x-2 cursor-pointer"
-                  title="Wipe all uploaded physical files, ChromaDB vectors, and PostgreSQL records"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                  <span>Clear All Data</span>
-                </button>
+                {(() => {
+                  const currentUser = JSON.parse(localStorage.getItem('cogniva_user') || '{}');
+                  const isOrgAdmin = currentUser?.user_type === 'org_admin' || currentUser?.user_type === 'cogniva_admin';
+                  if (isOrgAdmin) {
+                    return (
+                      <button
+                        onClick={handleClearAll}
+                        className="flex-1 sm:flex-none px-4 py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-semibold rounded-xl text-xs transition-all flex items-center justify-center space-x-2 cursor-pointer"
+                        title="Wipe organization uploaded files, ChromaDB vectors, and PostgreSQL records"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Clear All Data</span>
+                      </button>
+                    );
+                  }
+                  return (
+                    <div className="flex-1 sm:flex-none px-3.5 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1.5 select-none" title="All documents are securely shared across colleagues within your organization">
+                      <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Shared Org Hub</span>
+                    </div>
+                  );
+                })()}
               </div>
               <button
                 onClick={() => setActiveTab('add')}

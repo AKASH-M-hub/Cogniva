@@ -43,7 +43,6 @@ export default function AuthPages({ onLoginSuccess, onBackToSaaS }) {
   useEffect(() => {
     if (view === 'login') {
       setLoginEmail(localStorage.getItem('cogniva_saved_email') || '');
-      setLoginPassword(localStorage.getItem('cogniva_saved_pass') || '');
     }
   }, [view, activeRole]);
   
@@ -57,7 +56,8 @@ export default function AuthPages({ onLoginSuccess, onBackToSaaS }) {
     setLoading(true);
     setError('');
     try {
-      const res = await api.post('/auth/login', { email: loginEmail, password: loginPassword });
+      const cleanEmail = loginEmail.trim().toLowerCase();
+      const res = await api.post('/auth/login', { email: cleanEmail, password: loginPassword });
       if (res.data.success) {
         const userObj = res.data.user;
         
@@ -68,8 +68,10 @@ export default function AuthPages({ onLoginSuccess, onBackToSaaS }) {
         }
         
         localStorage.setItem('cogniva_user', JSON.stringify(userObj));
-        localStorage.setItem('cogniva_saved_email', loginEmail);
-        localStorage.setItem('cogniva_saved_pass', loginPassword);
+        localStorage.setItem('cogniva_saved_email', cleanEmail);
+        if (res.data.token) {
+          localStorage.setItem('cogniva_token', res.data.token);
+        }
         onLoginSuccess(userObj);
       } else {
         setError(res.data.message || 'Invalid credentials');
@@ -77,11 +79,14 @@ export default function AuthPages({ onLoginSuccess, onBackToSaaS }) {
     } catch (err) {
       if (err.response?.data?.detail) {
         setError(err.response.data.detail);
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('Server request timed out. Please check if the backend is running.');
       } else {
         setError(err.response?.data?.message || 'Server connection error. Ensure backend is running.');
       }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSignup = async (e) => {
@@ -90,25 +95,31 @@ export default function AuthPages({ onLoginSuccess, onBackToSaaS }) {
     setError('');
     try {
       let res;
+      const cleanAdminEmail = signupForm.admin_email.trim().toLowerCase();
       if (activeRole === 'cogniva_admin') {
         const payload = {
-          admin_name: signupForm.admin_name,
-          admin_email: signupForm.admin_email,
+          admin_name: signupForm.admin_name.trim(),
+          admin_email: cleanAdminEmail,
           admin_password: signupForm.admin_password
         };
         res = await api.post('/auth/register/cogniva-admin', payload);
       } else {
         const payload = {
-          ...signupForm
+          ...signupForm,
+          org_name: signupForm.org_name.trim(),
+          admin_name: signupForm.admin_name.trim(),
+          admin_email: cleanAdminEmail
         };
         res = await api.post('/auth/register/organization', payload);
       }
       if (res.data.success) {
-        const loginRes = await api.post('/auth/login', { email: signupForm.admin_email, password: signupForm.admin_password });
+        const loginRes = await api.post('/auth/login', { email: cleanAdminEmail, password: signupForm.admin_password });
         if (loginRes.data.success) {
           localStorage.setItem('cogniva_user', JSON.stringify(loginRes.data.user));
-          localStorage.setItem('cogniva_saved_email', signupForm.admin_email);
-          localStorage.setItem('cogniva_saved_pass', signupForm.admin_password);
+          localStorage.setItem('cogniva_saved_email', cleanAdminEmail);
+          if (loginRes.data.token) {
+            localStorage.setItem('cogniva_token', loginRes.data.token);
+          }
           onLoginSuccess(loginRes.data.user);
         }
       } else {
@@ -117,11 +128,14 @@ export default function AuthPages({ onLoginSuccess, onBackToSaaS }) {
     } catch (err) {
        if (err.response?.data?.detail) {
          setError(err.response.data.detail);
+       } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+         setError('Registration request timed out. Please check if backend is running.');
        } else {
          setError(err.response?.data?.message || 'Registration error. Email might be in use.');
        }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const getRoleConfig = () => {

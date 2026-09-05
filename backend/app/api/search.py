@@ -136,16 +136,21 @@ def get_search_analytics():
 @router.get("/history")
 def get_search_history(
     limit: int = 500,
+    user_id: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     """
     Employer/Employee Search Query History Endpoint:
-    Returns timestamped history of executed search queries from PostgreSQL.
+    Returns timestamped history of executed search queries from PostgreSQL, scoped by user_id if supplied.
     """
     try:
         from app.models.search_history import SearchHistory
-        total_count = db.query(SearchHistory).count()
-        records = db.query(SearchHistory).order_by(SearchHistory.search_time.desc()).limit(limit).all()
+        q = db.query(SearchHistory)
+        if user_id:
+            q = q.filter(SearchHistory.user_id == user_id)
+
+        total_count = q.count()
+        records = q.order_by(SearchHistory.search_time.desc()).limit(limit).all()
         history = []
         for r in records:
             ts = r.search_time.strftime("%Y-%m-%d %H:%M") if r.search_time else "2026-08-12 14:00"
@@ -165,11 +170,17 @@ def get_search_history(
 
 
 @router.delete("/history/clear")
-def clear_search_history(db: Session = Depends(get_db)):
-    """Wipes all search query history records from PostgreSQL search_history table."""
+def clear_search_history(
+    user_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Wipes search query history records from PostgreSQL, scoped by user_id if supplied."""
     try:
         from app.models.search_history import SearchHistory
-        db.query(SearchHistory).delete()
+        q = db.query(SearchHistory)
+        if user_id:
+            q = q.filter(SearchHistory.user_id == user_id)
+        q.delete()
         db.commit()
         return {"success": True, "message": "Search history cleared."}
     except Exception as e:

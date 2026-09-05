@@ -1,0 +1,14 @@
+Wiped table document_chunks
+Wiped table documents
+Wiped table memory_vault
+Table audit_logs skip: (sqlite3.OperationalError) no such table: audit_logs
+[SQL: DELETE FROM audit_logs;]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Wiped table search_history
+Wiped table notifications
+Table gaps skip: (sqlite3.OperationalError) no such table: gaps
+[SQL: DELETE FROM gaps;]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Wiped table users
+Wiped table organizations
+PURGE_SUCCESSFUL

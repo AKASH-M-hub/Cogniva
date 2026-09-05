@@ -18,9 +18,35 @@ def update_db():
             
         try:
             conn.execute(text("ALTER TABLE users ADD COLUMN org_id INTEGER"))
-            logger.info("Added org_id column.")
+            logger.info("Added org_id column to users.")
         except Exception as e:
-            logger.info(f"Column org_id might already exist: {e}")
+            logger.info(f"Column org_id in users might already exist: {e}")
+
+        # Multi-Tenant & User Ownership for Documents
+        try:
+            conn.execute(text("ALTER TABLE documents ADD COLUMN org_id INTEGER"))
+            logger.info("Added org_id column to documents.")
+        except Exception as e:
+            logger.info(f"Column org_id in documents might already exist: {e}")
+
+        try:
+            conn.execute(text("ALTER TABLE documents ADD COLUMN user_id INTEGER"))
+            logger.info("Added user_id column to documents.")
+        except Exception as e:
+            logger.info(f"Column user_id in documents might already exist: {e}")
+
+        # Multi-Tenant & User Ownership for Memories
+        try:
+            conn.execute(text("ALTER TABLE memory_vault ADD COLUMN org_id INTEGER"))
+            logger.info("Added org_id column to memory_vault.")
+        except Exception as e:
+            pass
+
+        try:
+            conn.execute(text("ALTER TABLE memory_vault ADD COLUMN user_id INTEGER"))
+            logger.info("Added user_id column to memory_vault.")
+        except Exception as e:
+            pass
 
 if __name__ == "__main__":
     update_db()

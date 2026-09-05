@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, Key, Send, CheckCircle2, AlertTriangle, ShieldCheck, 
   UserPlus, BarChart2, User, Mail, Lock, PlusCircle, Activity, 
-  Clock, FileText, ArrowRight, ShieldAlert 
+  Clock, FileText, ArrowRight, ShieldAlert, Eye, EyeOff 
 } from 'lucide-react';
 import api, { adminAPI } from '../../services/api';
 
@@ -10,15 +10,18 @@ export default function OrgManagement({ activeModule }) {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   
+  const currentUser = JSON.parse(localStorage.getItem('cogniva_user') || '{}');
+  const userOrgId = currentUser?.org_id || 1;
+  const isCognivaAdmin = currentUser?.user_type === 'cogniva_admin';
+
   // Employee Creation
   const [empForm, setEmpForm] = useState({
-    full_name: '', email: '', password: '', department: '', role: '', org_id: 1
+    full_name: '', email: '', password: '', department: '', role: '', org_id: userOrgId
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showCredPasswords, setShowCredPasswords] = useState({});
   const [recentCredentials, setRecentCredentials] = useState([]);
   const [empNotice, setEmpNotice] = useState('');
-
-  const currentUser = JSON.parse(localStorage.getItem('cogniva_user') || '{}');
-  const isCognivaAdmin = currentUser?.user_type === 'cogniva_admin';
 
   useEffect(() => {
     fetchEmployees();
@@ -26,7 +29,7 @@ export default function OrgManagement({ activeModule }) {
 
   const fetchEmployees = async () => {
     setLoading(true);
-    const data = await adminAPI.getEmployees();
+    const data = await adminAPI.getEmployees(isCognivaAdmin ? null : userOrgId);
     setEmployees(data || []);
     setLoading(false);
   };
@@ -40,8 +43,17 @@ export default function OrgManagement({ activeModule }) {
   
   const handleCreateEmployee = async (e) => {
     e.preventDefault();
+    if (!empForm.password || empForm.password.length < 8) {
+      setEmpNotice('Security Error: Password must be at least 8 characters long.');
+      setTimeout(() => setEmpNotice(''), 4000);
+      return;
+    }
+
     try {
-      const res = await api.post('/auth/register/employee', empForm);
+      const res = await api.post('/auth/register/employee', {
+        ...empForm,
+        org_id: userOrgId
+      });
       if (res.data.success) {
         setEmpNotice(res.data.message);
         
@@ -54,7 +66,7 @@ export default function OrgManagement({ activeModule }) {
         }, ...prev]);
 
         fetchEmployees();
-        setEmpForm({ full_name: '', email: '', password: '', department: '', role: '', org_id: 1 });
+        setEmpForm({ full_name: '', email: '', password: '', department: '', role: '', org_id: userOrgId });
       } else {
         setEmpNotice(`Error: ${res.data.message}`);
       }
@@ -123,7 +135,17 @@ export default function OrgManagement({ activeModule }) {
                        </div>
                        <div className="flex items-center space-x-2">
                          <span className="text-[10px] font-sans text-slate-400 font-bold">PASSWORD:</span>
-                         <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold tracking-wider">{cred.password}</span>
+                         <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold tracking-wider">
+                           {showCredPasswords[idx] ? cred.password : '••••••••••••'}
+                         </span>
+                         <button
+                           type="button"
+                           onClick={() => setShowCredPasswords(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                           className="text-amber-700 hover:text-amber-900 cursor-pointer p-1"
+                           title={showCredPasswords[idx] ? "Hide password" : "Show password"}
+                         >
+                           {showCredPasswords[idx] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                         </button>
                        </div>
                      </div>
                    ))}
@@ -165,17 +187,30 @@ export default function OrgManagement({ activeModule }) {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Temporary Password</label>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  Temporary Password <span className="text-slate-400 normal-case">(min 8 characters)</span>
+                </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                     <Lock className="h-4 w-4 text-slate-400" />
                   </div>
                   <input
-                    type="text" required
-                    value={empForm.password} onChange={(e) => setEmpForm({...empForm, password: e.target.value})}
-                    className="block w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
-                    placeholder="Create a secure password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={8}
+                    value={empForm.password}
+                    onChange={(e) => setEmpForm({...empForm, password: e.target.value})}
+                    className="block w-full pl-10 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
+                    placeholder="••••••••"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                    title={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
 

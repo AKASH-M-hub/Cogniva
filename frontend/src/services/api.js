@@ -4,7 +4,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localho
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 0, // 0 = Infinite wait (never aborts, waits until backend finishes processing)
 });
 
 api.interceptors.request.use((config) => {

@@ -1,9 +1,17 @@
 import os
-import fitz
-from rapidocr_onnxruntime import RapidOCR
 
-# Initialize OCR minimally
-ocr_engine = RapidOCR()
+_ocr_engine = None
+
+def get_ocr_engine():
+    global _ocr_engine
+    if _ocr_engine is None:
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+            _ocr_engine = RapidOCR()
+        except Exception as e:
+            _ocr_engine = False
+    return _ocr_engine if _ocr_engine is not False else None
+
 
 def extract_text(file_path: str) -> str:
     """Extracts text from PDF (including OCR for images), TXT, DOCX, MD, and images robustly."""
@@ -20,36 +28,49 @@ def extract_text(file_path: str) -> str:
         except Exception:
             pass
 
-    # 2. PDF Files (with PyMuPDF and RapidOCR)
+    # 2. PDF Files (with PyMuPDF and RapidOCR, fallback to pypdf)
     if ext == ".pdf":
         try:
+            import fitz
             doc = fitz.open(file_path)
             extracted_text = ""
+            ocr_engine = get_ocr_engine()
             for page in doc:
                 text = page.get_text()
                 if text.strip():
                     extracted_text += text + "\n"
                 
-                # Extract image content for OCR
-                image_list = page.get_images(full=True)
-                for img in image_list:
+                # Extract image content for OCR if engine is available
+                if ocr_engine:
                     try:
-                        xref = img[0]
-                        base_image = doc.extract_image(xref)
-                        image_bytes = base_image["image"]
-                        
-                        result, _ = ocr_engine(image_bytes)
-                        if result:
-                            # result is a list of tuples: (box, text, confidence)
-                            ocr_text = " ".join([item[1] for item in result if item[1]])
-                            if ocr_text.strip():
-                                extracted_text += f"\n[Image Extract]: {ocr_text}\n"
+                        image_list = page.get_images(full=True)
+                        for img in image_list:
+                            try:
+                                xref = img[0]
+                                base_image = doc.extract_image(xref)
+                                image_bytes = base_image["image"]
+                                
+                                result, _ = ocr_engine(image_bytes)
+                                if result:
+                                    ocr_text = " ".join([item[1] for item in result if item[1]])
+                                    if ocr_text.strip():
+                                        extracted_text += f"\n[Image Extract]: {ocr_text}\n"
+                            except Exception:
+                                pass
                     except Exception:
                         pass
             if extracted_text.strip():
                 return extracted_text.strip()
         except Exception as e:
-            print(f"pdf extraction notice: {e}")
+            # Fallback to pure-python pypdf
+            try:
+                import pypdf
+                reader = pypdf.PdfReader(file_path)
+                text = "\n".join([p.extract_text() or "" for p in reader.pages])
+                if text.strip():
+                    return text.strip()
+            except Exception:
+                print(f"pdf extraction notice: {e}")
 
     # 3. DOCX Files
     if ext in [".docx", ".doc"]:

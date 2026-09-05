@@ -465,7 +465,7 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
         top_k: 5
       });
 
-      const aiResponseText = res?.answer || res?.response || 'No response returned from Qwen 2.5 3B model.';
+      const aiResponseText = res?.answer || res?.response || 'No response returned from model.';
 
       const aiMessage = {
         id: Date.now() + 1,
@@ -482,7 +482,7 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
       const errorMessage = {
         id: Date.now() + 1,
         sender: 'ai',
-        text: 'Unable to connect to Qwen 2.5 3B AI engine. Please verify backend server is running.',
+        text: 'Unable to connect to AI engine. Please verify backend server is running.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isError: true
       };
@@ -617,7 +617,7 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
                   <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-1.5">
                     <div className="flex items-center space-x-2">
                       <span className={`text-[10px] font-extrabold uppercase tracking-wider ${isAI ? 'text-indigo-600' : 'text-indigo-100'}`}>
-                        {isAI ? 'Echo AI (Qwen 2.5 3B)' : 'You'}
+                        {isAI ? 'Echo AI (Cogniva Engine)' : 'You'}
                       </span>
                       {msg.docBadge && (
                         <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[9px] border border-indigo-100 flex items-center space-x-1">
@@ -664,7 +664,7 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
               <EchoLogo size="w-9 h-9" />
               <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 text-xs text-slate-600 font-semibold flex items-center space-x-2 shadow-2xs">
                 <RefreshCw className="w-4 h-4 text-indigo-600 animate-spin" />
-                <span>Echo is analyzing context with Qwen 2.5 3B...</span>
+                <span>Echo AI is synthesizing answer...</span>
               </div>
             </div>
           )}

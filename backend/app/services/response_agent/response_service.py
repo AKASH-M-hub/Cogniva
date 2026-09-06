@@ -298,7 +298,14 @@ def execute_response_agent_pipeline(request: ChatRequest) -> ChatResponse:
 
     # 3. Knowledge Gap Check
     if not search_res.results:
-        log_search_execution(effective_question, results_count=0, latency_ms=10.0, user_department=dept)
+        log_search_execution(
+            effective_question,
+            results_count=0,
+            latency_ms=10.0,
+            user_department=dept,
+            user_id=user_id,
+            user_email=getattr(request, 'user_email', None)
+        )
         return ChatResponse(
             success=True,
             question=raw_question,

@@ -14,6 +14,7 @@ class ChatRequest(BaseModel):
     summary_type: Optional[str] = Field(None, description="Optional summary mode (5-line, 1-page, executive)")
     enable_multi_agent: bool = Field(True, description="Enable multi-agent collaboration")
     enable_self_reflection: bool = Field(True, description="Enable agentic RAG self-reflection and hallucination check")
+    user_email: Optional[str] = Field(None, description="User email for knowledge gap notification")
 
 
 class CitationItem(BaseModel):

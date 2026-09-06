@@ -185,11 +185,11 @@ export default function AuthPages({ onLoginSuccess, onBackToSaaS }) {
 
       <CognivaHexLogo />
       
-      <div className="text-center space-y-4">
-        <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight">
+      <div className="text-center space-y-3 sm:space-y-4 px-2">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight">
           Select Access Level
         </h1>
-        <p className="text-slate-500 font-medium text-lg max-w-xl mx-auto">
+        <p className="text-slate-500 font-medium text-base sm:text-lg max-w-xl mx-auto">
           Choose your designated role to enter the most advanced enterprise intelligence platform.
         </p>
       </div>
@@ -198,7 +198,7 @@ export default function AuthPages({ onLoginSuccess, onBackToSaaS }) {
         {/* Employee Card */}
         <button 
           onClick={() => { setActiveRole('employee'); setView('login'); setError(''); }}
-          className="group relative bg-white/80 backdrop-blur-xl border border-slate-200/80 hover:border-blue-300 rounded-3xl p-8 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/10 overflow-hidden cursor-pointer shadow-xl shadow-slate-200/30"
+          className="group relative bg-white/80 backdrop-blur-xl border border-slate-200/80 hover:border-blue-300 rounded-3xl p-6 sm:p-8 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/10 overflow-hidden cursor-pointer shadow-xl shadow-slate-200/30"
         >
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
             <User className="w-24 h-24 text-blue-600" />
@@ -219,7 +219,7 @@ export default function AuthPages({ onLoginSuccess, onBackToSaaS }) {
         {/* Org Admin Card */}
         <button 
           onClick={() => { setActiveRole('org_admin'); setView('login'); setError(''); }}
-          className="group relative bg-white/80 backdrop-blur-xl border border-slate-200/80 hover:border-blue-300 rounded-3xl p-8 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/10 overflow-hidden cursor-pointer shadow-xl shadow-slate-200/30"
+          className="group relative bg-white/80 backdrop-blur-xl border border-slate-200/80 hover:border-blue-300 rounded-3xl p-6 sm:p-8 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/10 overflow-hidden cursor-pointer shadow-xl shadow-slate-200/30"
         >
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
             <Building className="w-24 h-24 text-blue-600" />
@@ -240,7 +240,7 @@ export default function AuthPages({ onLoginSuccess, onBackToSaaS }) {
         {/* Cogniva Admin Card */}
         <button 
           onClick={() => { setActiveRole('cogniva_admin'); setView('login'); setError(''); }}
-          className="group relative bg-white/80 backdrop-blur-xl border border-slate-200/80 hover:border-blue-300 rounded-3xl p-8 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/10 overflow-hidden cursor-pointer shadow-xl shadow-slate-200/30"
+          className="group relative bg-white/80 backdrop-blur-xl border border-slate-200/80 hover:border-blue-300 rounded-3xl p-6 sm:p-8 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/10 overflow-hidden cursor-pointer shadow-xl shadow-slate-200/30"
         >
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
             <Database className="w-24 h-24 text-blue-600" />
@@ -274,7 +274,7 @@ export default function AuthPages({ onLoginSuccess, onBackToSaaS }) {
           <ArrowLeft className="w-4 h-4 mr-2" /> Back to Selection
         </button>
 
-        <div className="bg-white/95 backdrop-blur-2xl border border-slate-200/80 rounded-3xl p-8 shadow-2xl shadow-slate-200/60 relative overflow-hidden">
+        <div className="bg-white/95 backdrop-blur-2xl border border-slate-200/80 rounded-3xl p-5 sm:p-8 shadow-2xl shadow-slate-200/60 relative overflow-hidden">
           {/* Subtle gradient background ribbon based on role */}
           <div className={`absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r ${config.color}`} />
           <div className={`absolute -top-32 -right-32 w-64 h-64 bg-gradient-to-br ${config.color} opacity-[0.03] blur-[80px] rounded-full pointer-events-none`} />
@@ -373,7 +373,7 @@ export default function AuthPages({ onLoginSuccess, onBackToSaaS }) {
         <ArrowLeft className="w-4 h-4 mr-2" /> Back to Admin Login
       </button>
 
-      <div className="bg-white/95 backdrop-blur-2xl border border-slate-200/80 rounded-3xl p-8 shadow-2xl shadow-slate-200/60 relative overflow-hidden">
+      <div className="bg-white/95 backdrop-blur-2xl border border-slate-200/80 rounded-3xl p-5 sm:p-8 shadow-2xl shadow-slate-200/60 relative overflow-hidden">
         <div className={`absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-600 to-blue-700`} />
         
         <div className="text-center mb-8">

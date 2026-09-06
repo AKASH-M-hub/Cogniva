@@ -77,24 +77,24 @@ export default function OrgManagement({ activeModule }) {
   };
 
   return (
-    <div className="w-full p-8 space-y-8 select-none text-left font-sans">
+    <div className="w-full p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 select-none text-left font-sans max-w-full overflow-x-hidden">
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2 border-b border-slate-200/80">
-        <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
-            <ShieldCheck className="w-6 h-6" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 pb-4 border-b border-slate-200/80">
+        <div className="flex items-center space-x-3 sm:space-x-4">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-sm shrink-0">
+            <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <div>
-            <div className="flex items-center space-x-2">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                 {isCognivaAdmin ? 'Master System Admin Panel' : 'Organization Admin Panel'}
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                 Workspace Control
               </span>
             </div>
-            <p className="text-sm text-slate-500 font-medium mt-0.5">
+            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
               Manage employee credentials, access approvals, and monitor system telemetry.
             </p>
           </div>
@@ -105,7 +105,7 @@ export default function OrgManagement({ activeModule }) {
         
         {/* MODULE 1: PROVISIONING */}
         {activeModule === 'provisioning' && (
-          <div className="max-w-2xl bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
+          <div className="max-w-2xl bg-white border border-slate-200 rounded-3xl p-4 sm:p-8 shadow-sm">
             <div className="flex items-center space-x-3 mb-6">
               <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
                 <UserPlus className="w-5 h-5 text-blue-600" />
@@ -214,7 +214,7 @@ export default function OrgManagement({ activeModule }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Department</label>
                   <input
@@ -250,13 +250,13 @@ export default function OrgManagement({ activeModule }) {
 
         {/* MODULE 2: DIRECTORY & ACCESS */}
         {activeModule === 'directory' && (
-          <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-8 shadow-sm">
             <div className="flex items-center space-x-3 mb-6">
-              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
+              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100 shrink-0">
                 <Users className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-slate-900">{isCognivaAdmin ? 'Organization Admins Directory' : 'Employee Directory & Approvals'}</h2>
+                <h2 className="text-base sm:text-lg font-bold text-slate-900">{isCognivaAdmin ? 'Organization Admins Directory' : 'Employee Directory & Approvals'}</h2>
                 <p className="text-xs text-slate-500 font-medium">Review credentials and active approvals across the {isCognivaAdmin ? 'platform' : 'organization'}.</p>
               </div>
             </div>
@@ -331,14 +331,14 @@ export default function OrgManagement({ activeModule }) {
         {/* MODULE 3: PERFORMANCE REPORTS */}
         {activeModule === 'performance' && (
           <div className="space-y-6">
-            <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
-              <div className="flex items-center justify-between mb-8">
+            <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-8 shadow-sm">
+              <div className="flex items-center justify-between mb-6 sm:mb-8">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
+                  <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100 shrink-0">
                     <Activity className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-slate-900">Employee Performance Metrics</h2>
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900">Employee Performance Metrics</h2>
                     <p className="text-xs text-slate-500 font-medium">Aggregated query processing and system engagement reports based on active employees.</p>
                   </div>
                 </div>

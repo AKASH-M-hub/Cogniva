@@ -261,16 +261,16 @@ export default function AnalyticsAgentWorkspace() {
 
   return (
     <>
-      <div ref={dashboardRef} className="w-full p-6 lg:p-10 space-y-8 select-none text-left font-sans text-slate-900 bg-slate-50/50 min-h-full">
+      <div ref={dashboardRef} className="w-full p-4 sm:p-6 lg:p-10 space-y-6 sm:space-y-8 select-none text-left font-sans text-slate-900 bg-slate-50/50 min-h-full max-w-full overflow-x-hidden">
         {/* HEADER */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-6 border-b border-slate-200">
-          <div className="flex items-center space-x-4">
-            <div className="w-14 h-14 bg-gradient-to-tr from-indigo-600 to-violet-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <User className="w-7 h-7" />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
+          <div className="flex items-center space-x-3 sm:space-x-4">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-tr from-indigo-600 to-violet-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
+              <User className="w-6 h-6 sm:w-7 sm:h-7" />
             </div>
             <div>
-              <h1 className="text-3xl font-black tracking-tight text-slate-900">Employee Analytics</h1>
-              <p className="text-sm font-semibold text-slate-500 mt-1">Review your personal activity, search analytics, and usage trends across Cogniva.</p>
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">Employee Analytics</h1>
+              <p className="text-xs sm:text-sm font-semibold text-slate-500 mt-1">Review your personal activity, search analytics, and usage trends across Cogniva.</p>
             </div>
           </div>
         </div>
@@ -405,10 +405,10 @@ export default function AnalyticsAgentWorkspace() {
 
               <div className="flex-1 overflow-y-auto divide-y divide-slate-100 flex flex-col justify-center">
                 {/* Report 1 - Weekly */}
-                <div className="px-5 py-6 flex items-center justify-between hover:bg-slate-50 transition-colors group border-b-0">
-                  <div className="flex items-start space-x-4">
-                    <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 group-hover:scale-110 transition-transform">
-                      <Calendar className="w-5 h-5" />
+                <div className="px-4 sm:px-5 py-4 sm:py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 transition-colors group border-b-0">
+                  <div className="flex items-start space-x-3 sm:space-x-4">
+                    <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 group-hover:scale-110 transition-transform shrink-0">
+                      <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-slate-900 leading-snug">Weekly Analytics PDF</h3>
@@ -418,7 +418,7 @@ export default function AnalyticsAgentWorkspace() {
                   <button
                     onClick={() => !isGenerating && handleExportPDF('Weekly')}
                     disabled={isGenerating !== null}
-                    className={`text-[11px] font-black text-white px-4 py-2 rounded-lg text-center uppercase tracking-wide transition-colors shadow-sm flex items-center space-x-1.5 ${isGenerating !== null ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 cursor-pointer'}`}
+                    className={`text-[11px] font-black text-white px-4 py-2.5 rounded-lg text-center uppercase tracking-wide transition-colors shadow-xs flex items-center justify-center space-x-1.5 w-full sm:w-auto shrink-0 ${isGenerating !== null ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 cursor-pointer'}`}
                   >
                     {isGenerating === 'Weekly' ? (
                       <>
@@ -432,10 +432,10 @@ export default function AnalyticsAgentWorkspace() {
                 </div>
 
                 {/* Report 2 - Overall Context */}
-                <div className="px-5 py-6 flex items-center justify-between hover:bg-slate-50 transition-colors group">
-                  <div className="flex items-start space-x-4">
-                    <div className="p-2.5 rounded-xl bg-slate-100 text-slate-600 border border-slate-200 group-hover:scale-110 transition-transform">
-                      <FolderOpen className="w-5 h-5" />
+                <div className="px-4 sm:px-5 py-4 sm:py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 transition-colors group">
+                  <div className="flex items-start space-x-3 sm:space-x-4">
+                    <div className="p-2 sm:p-2.5 rounded-xl bg-slate-100 text-slate-600 border border-slate-200 group-hover:scale-110 transition-transform shrink-0">
+                      <FolderOpen className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-slate-900 leading-snug">Overall Analytics PDF</h3>
@@ -445,7 +445,7 @@ export default function AnalyticsAgentWorkspace() {
                   <button
                     onClick={() => !isGenerating && handleExportPDF('Overall')}
                     disabled={isGenerating !== null}
-                    className={`text-[11px] font-black text-white px-4 py-2 rounded-lg text-center uppercase tracking-wide transition-colors shadow-sm flex items-center space-x-1.5 ${isGenerating !== null ? 'bg-slate-500 cursor-not-allowed' : 'bg-slate-800 hover:bg-slate-900 cursor-pointer'}`}
+                    className={`text-[11px] font-black text-white px-4 py-2.5 rounded-lg text-center uppercase tracking-wide transition-colors shadow-xs flex items-center justify-center space-x-1.5 w-full sm:w-auto shrink-0 ${isGenerating !== null ? 'bg-slate-500 cursor-not-allowed' : 'bg-slate-800 hover:bg-slate-900 cursor-pointer'}`}
                   >
                     {isGenerating === 'Overall' ? (
                       <>

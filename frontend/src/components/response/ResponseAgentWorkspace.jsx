@@ -549,31 +549,31 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
   };
 
   return (
-    <div className="w-full p-8 space-y-6 select-none text-left font-sans text-slate-900">
+    <div className="w-full p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 select-none text-left font-sans text-slate-900 max-w-full overflow-x-hidden">
       {/* INDIGO BLUE HEADER BANNER CARD WITH ECHO BRANDING */}
-      <div className="bg-indigo-600 text-white border border-indigo-500 rounded-2xl p-6 shadow-lg shadow-indigo-500/20 flex flex-col xl:flex-row xl:items-center justify-between gap-6 relative overflow-hidden">
+      <div className="bg-indigo-600 text-white border border-indigo-500 rounded-2xl p-4 sm:p-6 shadow-lg shadow-indigo-500/20 flex flex-col xl:flex-row xl:items-center justify-between gap-4 sm:gap-6 relative overflow-hidden">
         <div className="absolute -top-12 -right-12 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="flex items-center space-x-4 relative z-10">
-          <EchoLogo size="w-12 h-12" iconSize="w-6 h-6" />
+        <div className="flex items-center space-x-3 sm:space-x-4 relative z-10">
+          <EchoLogo size="w-10 h-10 sm:w-12 sm:h-12" iconSize="w-5 h-5 sm:w-6 sm:h-6" />
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-extrabold tracking-tight text-white">Insight Desk</h1>
-              <span className="px-3 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-white/20 text-white border border-white/30 backdrop-blur-md">
+              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">Insight Desk</h1>
+              <span className="px-2.5 sm:px-3 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-white/20 text-white border border-white/30 backdrop-blur-md">
                 Echo Chatbot
               </span>
             </div>
-            <p className="text-sm text-indigo-100 font-medium mt-1">
+            <p className="text-xs sm:text-sm text-indigo-100 font-medium mt-1">
               Your workspace for exploring knowledge and getting intelligent answers
             </p>
           </div>
         </div>
 
         {/* HEADER ACTIONS: Chat History & New Chat */}
-        <div className="relative z-10 flex items-center space-x-3">
+        <div className="relative z-10 flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={() => setShowHistoryModal(true)}
-            className="px-4 py-2.5 bg-white/15 hover:bg-white/25 border border-white/25 text-white font-bold rounded-xl text-xs shadow-xs transition-all flex items-center space-x-2 cursor-pointer backdrop-blur-md"
+            className="flex-1 sm:flex-initial px-3.5 sm:px-4 py-2.5 bg-white/15 hover:bg-white/25 border border-white/25 text-white font-bold rounded-xl text-xs shadow-xs transition-all flex items-center justify-center space-x-2 cursor-pointer backdrop-blur-md"
             title="View Chatbot History"
           >
             <History className="w-4 h-4" />
@@ -582,7 +582,7 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
 
           <button
             onClick={handleStartNewChat}
-            className="px-4 py-2.5 bg-white text-indigo-700 hover:bg-indigo-50 font-bold rounded-xl text-xs shadow-md transition-all flex items-center space-x-2 cursor-pointer"
+            className="flex-1 sm:flex-initial px-3.5 sm:px-4 py-2.5 bg-white text-indigo-700 hover:bg-indigo-50 font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer"
           >
             <MessageSquarePlus className="w-4 h-4 text-indigo-600" />
             <span>New Chat</span>
@@ -591,20 +591,20 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
       </div>
 
       {/* ECHO CHATBOT MAIN CONTAINER */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-xs flex flex-col h-[680px] overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-xs flex flex-col h-[calc(100vh-220px)] min-h-[480px] md:h-[680px] overflow-hidden">
         {/* MESSAGES THREAD WITH SMOOTH SCROLLING */}
-        <div className="flex-1 p-6 overflow-y-auto space-y-5 bg-slate-50/50 scroll-smooth select-text">
+        <div className="flex-1 p-3.5 sm:p-6 overflow-y-auto space-y-4 sm:space-y-5 bg-slate-50/50 scroll-smooth select-text">
           {messages.map((msg) => {
             const isAI = msg.sender === 'ai';
             return (
               <div
                 key={msg.id}
-                className={`flex items-start space-x-3 transition-all duration-300 animate-in fade-in slide-in-from-bottom-2 ${isAI ? 'justify-start' : 'justify-end'}`}
+                className={`flex items-start space-x-2.5 sm:space-x-3 transition-all duration-300 animate-in fade-in slide-in-from-bottom-2 ${isAI ? 'justify-start' : 'justify-end'}`}
               >
-                {isAI && <EchoLogo size="w-9 h-9" />}
+                {isAI && <EchoLogo size="w-7 h-7 sm:w-9 sm:h-9" />}
 
                 <div
-                  className={`max-w-3xl rounded-2xl p-4 text-xs font-sans leading-relaxed shadow-2xs space-y-3 ${
+                  className={`max-w-[88%] sm:max-w-xl md:max-w-3xl rounded-2xl p-3 sm:p-4 text-xs font-sans leading-relaxed shadow-2xs space-y-2.5 sm:space-y-3 ${
                     isAI
                       ? msg.isWarning
                         ? 'bg-amber-50 border border-amber-200 text-amber-900'
@@ -672,9 +672,9 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
         </div>
 
         {/* INPUT PROMPT BAR WITH FILE ATTACHMENT */}
-        <div className="p-4 bg-white border-t border-slate-200 space-y-2">
+        <div className="p-3 sm:p-4 bg-white border-t border-slate-200 space-y-2">
           {attachedFile && (
-            <div className="flex items-center justify-between px-3.5 py-1.5 bg-indigo-50 border border-indigo-200 rounded-xl text-xs font-semibold text-indigo-700">
+            <div className="flex items-center justify-between px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-xl text-xs font-semibold text-indigo-700">
               <div className="flex items-center space-x-2 truncate">
                 <FileText className="w-4 h-4 text-indigo-600 shrink-0" />
                 <span className="truncate">Attached document: {attachedFile.name}</span>
@@ -688,7 +688,7 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
             </div>
           )}
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3">
             <input
               type="file"
               ref={fileInputRef}
@@ -699,10 +699,10 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
 
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-all cursor-pointer border border-slate-200"
+              className="p-2.5 sm:p-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-all cursor-pointer border border-slate-200 shrink-0"
               title="Attach document to chat with Echo"
             >
-              <Paperclip className="w-4.5 h-4.5 text-slate-600" />
+              <Paperclip className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-slate-600" />
             </button>
 
             <input
@@ -710,17 +710,17 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask Echo regarding documents, internal policies, or uploaded context..."
-              className="flex-1 px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-sans font-medium"
+              placeholder="Ask Echo regarding documents or knowledge..."
+              className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-sans font-medium"
             />
 
             <button
               onClick={() => handleSendMessage()}
               disabled={loading || (!inputQuery.trim() && !attachedFile)}
-              className="px-5 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center space-x-2 disabled:opacity-50 cursor-pointer shrink-0"
+              className="px-3.5 sm:px-5 py-2.5 sm:py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center space-x-1 sm:space-x-2 disabled:opacity-50 cursor-pointer shrink-0"
             >
               <Send className="w-4 h-4" />
-              <span>Send</span>
+              <span className="hidden sm:inline">Send</span>
             </button>
           </div>
         </div>
@@ -729,15 +729,15 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
       {/* CHAT HISTORY MODAL */}
       {showHistoryModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-xl w-full p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 sm:pb-4">
               <div className="flex items-center space-x-3">
-                <EchoLogo size="w-9 h-9" />
+                <EchoLogo size="w-8 h-8 sm:w-9 sm:h-9" />
                 <div>
-                  <h3 className="text-base font-extrabold text-slate-900">
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
                     Echo Chatbot History
                   </h3>
-                  <p className="text-xs text-slate-500 font-medium">
+                  <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
                     View, continue, or delete previous Echo chat sessions.
                   </p>
                 </div>
@@ -750,19 +750,19 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
               </button>
             </div>
 
-            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+            <div className="max-h-80 overflow-y-auto space-y-2 pr-1 flex-1">
               {chatSessions.length > 0 ? (
                 chatSessions.map((session) => (
                   <div
                     key={session.id}
                     onClick={() => handleSelectSession(session)}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                    className={`p-3 sm:p-4 rounded-2xl border transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
                       activeSessionId === session.id
                         ? 'bg-indigo-50 border-indigo-300 shadow-2xs'
                         : 'bg-white border-slate-200 hover:border-indigo-200 hover:bg-slate-50/80'
                     }`}
                   >
-                    <div className="space-y-1 truncate pr-4">
+                    <div className="space-y-1 truncate sm:pr-4">
                       <div className="flex items-center space-x-2">
                         <span className="font-bold text-xs text-slate-900 truncate">
                           {session.title || 'Echo Chat Session'}
@@ -778,7 +778,7 @@ export default function ResponseAgentWorkspace({ selectedContext }) {
                       </p>
                     </div>
 
-                    <div className="flex items-center space-x-2 shrink-0">
+                    <div className="flex items-center space-x-2 shrink-0 self-end sm:self-auto">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

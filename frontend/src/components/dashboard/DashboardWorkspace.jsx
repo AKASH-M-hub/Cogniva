@@ -94,36 +94,32 @@ export default function DashboardWorkspace({ onProceed }) {
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 font-sans antialiased select-none flex flex-col justify-between">
 
       {/* 1. CLEAN SAAS NAVBAR */}
-      <header className="bg-white/90 backdrop-blur-md border-b border-indigo-100/80 sticky top-0 z-50 px-6 lg:px-12 h-20 flex items-center justify-between shadow-xs">
+      <header className="bg-white/90 backdrop-blur-md border-b border-indigo-100/80 sticky top-0 z-50 px-4 sm:px-6 lg:px-12 h-16 sm:h-20 flex items-center justify-between shadow-xs">
         <CognivaHexLogo />
-
-
       </header>
 
       {/* MAIN CONTAINER */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-8 py-10 space-y-10">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-8 py-6 sm:py-10 space-y-6 sm:space-y-10">
 
         {/* 2. HERO SECTION */}
-        <section className="bg-white border border-indigo-100 rounded-3xl p-8 sm:p-12 shadow-xl shadow-indigo-500/5 relative overflow-hidden text-left">
+        <section className="bg-white border border-indigo-100 rounded-2xl sm:rounded-3xl p-6 sm:p-12 shadow-xl shadow-indigo-500/5 relative overflow-hidden text-left">
           {/* Solid Background Glow */}
           <div className="absolute -top-24 -right-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_0%,#000_70%,transparent_100%)] opacity-30 pointer-events-none" />
 
-          <div className="relative z-10 space-y-6 max-w-4xl">
-            <div className="space-y-3">
-              <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 leading-tight">
+          <div className="relative z-10 space-y-4 sm:space-y-6 max-w-4xl">
+            <div className="space-y-2 sm:space-y-3">
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 leading-tight">
                 Cogniva – <span className="text-indigo-600">Enterprise AI</span> Platform
               </h1>
-              <p className="text-xl sm:text-2xl font-bold text-indigo-600 tracking-tight">
+              <p className="text-lg sm:text-2xl font-bold text-indigo-600 tracking-tight">
                 Transforming Enterprise Knowledge into Dynamic Multi-Agent Intelligence
               </p>
             </div>
 
-            <p className="text-slate-600 text-base sm:text-lg font-medium leading-relaxed max-w-3xl">
+            <p className="text-slate-600 text-sm sm:text-lg font-medium leading-relaxed max-w-3xl">
               An Intelligent Multi-Agent platform that transforms enterprise knowledge into contextual insights, grounded responses and actionable intelligence.
             </p>
-
-
           </div>
         </section>
 
@@ -133,8 +129,8 @@ export default function DashboardWorkspace({ onProceed }) {
           {/* SAAS MARQUEE TICKER (SINGLE DISPLAY ROW) */}
           <div className="bg-white border border-indigo-100 rounded-2xl p-4 shadow-sm overflow-hidden relative">
             {/* Edge Blur Fades */}
-            <div className="absolute top-0 bottom-0 left-0 w-16 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
-            <div className="absolute top-0 bottom-0 right-0 w-16 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
+            <div className="absolute top-0 bottom-0 left-0 w-12 sm:w-16 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
+            <div className="absolute top-0 bottom-0 right-0 w-12 sm:w-16 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
 
             {/* Row 1: Left to Right Marquee */}
             <div className="overflow-hidden">
@@ -145,7 +141,7 @@ export default function DashboardWorkspace({ onProceed }) {
                   return (
                     <div
                       key={`r1-${i}`}
-                      className={`inline-flex items-center space-x-2.5 px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap select-none cursor-default transition-all duration-700 ${isHighlighted
+                      className={`inline-flex items-center space-x-2.5 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap select-none cursor-default transition-all duration-700 ${isHighlighted
                         ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20 scale-105'
                         : 'bg-slate-50 text-slate-700 border border-slate-200/90 opacity-90'
                         }`}
@@ -164,19 +160,15 @@ export default function DashboardWorkspace({ onProceed }) {
               </div>
             </div>
           </div>
-
-
-
-
         </section>
 
         {/* 4. VIBRANT INDIGO BOTTOM HERO CTA BANNER */}
-        <section className="bg-indigo-600 text-white rounded-3xl p-8 sm:p-12 shadow-2xl shadow-indigo-500/20 border border-indigo-500 flex flex-col md:flex-row items-center justify-between gap-8 w-full relative overflow-hidden text-left">
+        <section className="bg-indigo-600 text-white rounded-2xl sm:rounded-3xl p-6 sm:p-12 shadow-2xl shadow-indigo-500/20 border border-indigo-500 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-6 sm:gap-8 w-full relative overflow-hidden text-left">
           <div className="space-y-2 relative z-10 flex-1">
-            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight">
+            <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight">
               Ready to use Cogniva?
             </h2>
-            <p className="text-sm sm:text-base text-indigo-100 font-medium leading-relaxed max-w-2xl">
+            <p className="text-xs sm:text-base text-indigo-100 font-medium leading-relaxed max-w-2xl">
               Access Knowledge Hub, Data Scout, Insight Desk and Analytics right now.
             </p>
           </div>
@@ -184,7 +176,7 @@ export default function DashboardWorkspace({ onProceed }) {
           <div className="shrink-0 flex items-center relative z-10">
             <button
               onClick={() => onProceed('knowledge-hub')}
-              className="px-8 py-4 bg-white hover:bg-slate-50 text-indigo-700 font-black text-sm rounded-2xl shadow-xl transition-all flex items-center space-x-3 cursor-pointer whitespace-nowrap group active:scale-98"
+              className="w-full sm:w-auto justify-center px-6 sm:px-8 py-3.5 sm:py-4 bg-white hover:bg-slate-50 text-indigo-700 font-black text-sm rounded-2xl shadow-xl transition-all flex items-center space-x-3 cursor-pointer whitespace-nowrap group active:scale-98"
             >
               <span>Continue to Workspace</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

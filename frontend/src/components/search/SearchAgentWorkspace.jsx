@@ -234,21 +234,20 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
   };
 
   return (
-    <div className="w-full p-8 space-y-6 select-none text-left font-sans text-slate-900">
+    <div className="w-full p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 select-none text-left font-sans text-slate-900 max-w-full overflow-x-hidden">
       {/* SEARCH AGENT HEADER CARD */}
-      <div className="bg-indigo-600 text-white border border-indigo-500 rounded-2xl p-6 shadow-lg shadow-indigo-500/20 flex flex-col xl:flex-row xl:items-center justify-between gap-6 relative overflow-hidden">
+      <div className="bg-indigo-600 text-white border border-indigo-500 rounded-2xl p-4 sm:p-6 shadow-lg shadow-indigo-500/20 flex flex-col xl:flex-row xl:items-center justify-between gap-4 sm:gap-6 relative overflow-hidden">
         <div className="absolute -top-12 -right-12 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="flex items-center space-x-4 relative z-10">
-          <div className="w-12 h-12 rounded-2xl bg-white/15 border border-white/20 text-white flex items-center justify-center shadow-xs shrink-0">
-            <Search className="w-6 h-6 text-white" />
+        <div className="flex items-center space-x-3.5 sm:space-x-4 relative z-10">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/15 border border-white/20 text-white flex items-center justify-center shadow-xs shrink-0">
+            <Search className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-extrabold tracking-tight text-white">Data Scout</h1>
-
+              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">Data Scout</h1>
             </div>
-            <p className="text-sm text-indigo-100 font-medium mt-1">
+            <p className="text-xs sm:text-sm text-indigo-100 font-medium mt-0.5 sm:mt-1">
               Ask a question in your own words and find the information you need
             </p>
           </div>
@@ -256,10 +255,10 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
       </div>
 
       {/* WORKSPACE NAVIGATION TABS */}
-      <div className="flex items-center space-x-2 border-b border-slate-200 pb-2">
+      <div className="flex items-center space-x-2 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveTab('search')}
-          className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center space-x-2 cursor-pointer ${activeTab === 'search'
+          className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center space-x-2 cursor-pointer shrink-0 ${activeTab === 'search'
             ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
             : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
@@ -273,7 +272,7 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
             setActiveTab('history');
             fetchSearchHistory();
           }}
-          className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center space-x-2 cursor-pointer ${activeTab === 'history'
+          className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center space-x-2 cursor-pointer shrink-0 ${activeTab === 'history'
             ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
             : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
@@ -300,7 +299,7 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
       {activeTab === 'search' && (
         <div className="space-y-6">
           {/* SEARCH INPUT BAR & FILTERS CARD */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-xs space-y-4">
             <div className="flex flex-col md:flex-row items-center gap-3">
               <div className="relative flex-1 w-full">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -310,7 +309,7 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Ask any natural language question..."
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-sans font-medium"
+                  className="w-full pl-12 pr-4 py-3 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-sans font-medium"
                 />
                 {query && (
                   <button
@@ -322,12 +321,12 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
                 )}
               </div>
 
-              <div className="flex items-center space-x-2 w-full md:w-auto">
-                <div className="relative">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+                <div className="relative w-full sm:w-auto">
                   <select
                     value={departmentFilter}
                     onChange={(e) => setDepartmentFilter(e.target.value)}
-                    className="bg-slate-50 border border-slate-200 px-3.5 py-3.5 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
+                    className="w-full sm:w-auto bg-slate-50 border border-slate-200 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
                   >
                     <option value="all">All Departments</option>
                     <option value="hr">HR & Governance</option>
@@ -337,11 +336,11 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
                   </select>
                 </div>
 
-                <div className="relative">
+                <div className="relative w-full sm:w-auto">
                   <select
                     value={fileTypeFilter}
                     onChange={(e) => setFileTypeFilter(e.target.value)}
-                    className="bg-slate-50 border border-slate-200 px-3.5 py-3.5 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
+                    className="w-full sm:w-auto bg-slate-50 border border-slate-200 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
                   >
                     <option value="all">All File Types</option>
                     <option value="pdf">PDF Documents</option>
@@ -454,7 +453,7 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
                         </div>
 
                         {/* ACTION BUTTONS: Explore Echo & Download original file */}
-                        <div className="flex items-center justify-end space-x-3 pt-2 border-t border-slate-100">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-2 sm:space-x-3 pt-2 border-t border-slate-100">
                           <button
                             onClick={() => {
                               if (onViewAIResponse) {
@@ -468,7 +467,7 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
                                 });
                               }
                             }}
-                            className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/90 text-indigo-700 rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center space-x-2 shadow-2xs group"
+                            className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/90 text-indigo-700 rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center space-x-2 shadow-2xs group"
                             title="Explore document with Echo AI Assistant on Insight Desk"
                           >
                             <EchoWaveIcon className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition-transform" color="currentColor" />
@@ -477,7 +476,7 @@ export default function SearchAgentWorkspace({ onViewAIResponse, onNavigateToKno
 
                           <button
                             onClick={() => handleDownloadFile(doc)}
-                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center space-x-2 shadow-sm shadow-indigo-600/20"
+                            className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center space-x-2 shadow-sm shadow-indigo-600/20"
                           >
                             <Download className="w-4 h-4" />
                             <span>Download Original Document</span>

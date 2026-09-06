@@ -23,19 +23,19 @@ export default function CognivaNetwork() {
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs space-y-6">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-2xs space-y-6 max-w-full overflow-x-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
         <div className="flex items-center space-x-3">
-          <Network className="w-6 h-6 text-blue-600" />
+          <Network className="w-6 h-6 text-blue-600 shrink-0" />
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Cogniva Global Network</h2>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900">Cogniva Global Network</h2>
             <p className="text-xs text-slate-500 font-medium">List of all active enterprise client organizations on the platform.</p>
           </div>
         </div>
         {!loading && (
-          <div className="flex flex-col items-end">
+          <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center">
             <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Organizations</span>
-            <span className="text-2xl font-black text-blue-600 leading-none">{orgs.length}</span>
+            <span className="text-xl sm:text-2xl font-black text-blue-600 leading-none">{orgs.length}</span>
           </div>
         )}
       </div>

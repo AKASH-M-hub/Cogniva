@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Bell, Building2, ChevronDown, User, ShieldCheck } from 'lucide-react';
+import { Search, Bell, Building2, ChevronDown, User, ShieldCheck, Menu, Brain } from 'lucide-react';
 import { API_BASE_URL } from '../../services/api';
 
-export default function TopNavbar({ activeWorkspace, setActiveWorkspace }) {
+export default function TopNavbar({ activeWorkspace, setActiveWorkspace, onOpenMobileMenu }) {
   const [profile, setProfile] = useState({
     name: 'Loading...',
     role: 'Employee',
@@ -91,12 +91,28 @@ export default function TopNavbar({ activeWorkspace, setActiveWorkspace }) {
   };
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
-      {/* Left space */}
-      <div></div>
+    <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+      {/* Left: Mobile Hamburger Toggle + Brand */}
+      <div className="flex items-center space-x-3">
+        <button
+          onClick={onOpenMobileMenu}
+          className="md:hidden p-2 -ml-1 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+          title="Open Navigation Menu"
+          aria-label="Open Navigation Menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        <div className="flex items-center space-x-2 md:hidden">
+          <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <Brain className="w-4 h-4 text-white stroke-[2.5]" />
+          </div>
+          <span className="font-black text-sm tracking-tight text-slate-900">COGNIVA</span>
+        </div>
+      </div>
 
       {/* Right: Workspace Controls, Notifications & Profile */}
-      <div className="flex items-center space-x-5">
+      <div className="flex items-center space-x-3 sm:space-x-5">
 
 
         {/* Notifications */}
@@ -112,7 +128,7 @@ export default function TopNavbar({ activeWorkspace, setActiveWorkspace }) {
           </button>
           
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden">
+            <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-sm bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden">
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                 <h3 className="font-bold text-slate-800">Notifications</h3>
                 <span className="text-xs font-semibold bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md">{notifications.filter(n => !n.is_read).length} new</span>

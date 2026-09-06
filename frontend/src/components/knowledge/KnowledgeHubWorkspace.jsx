@@ -619,32 +619,30 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
   );
 
   return (
-    <div className="w-full p-8 space-y-8 select-none text-left font-sans text-slate-900">
+    <div className="w-full p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 select-none text-left font-sans text-slate-900 max-w-full overflow-x-hidden">
       {/* UNIFIED KNOWLEDGE HUB HEADER CARD WITH INTEGRATED TABS */}
-      <div className="bg-indigo-600 text-white border border-indigo-500 rounded-2xl p-6 shadow-lg shadow-indigo-500/20 flex flex-col xl:flex-row xl:items-center justify-between gap-6 relative overflow-hidden">
+      <div className="bg-indigo-600 text-white border border-indigo-500 rounded-2xl p-4 sm:p-6 shadow-lg shadow-indigo-500/20 flex flex-col xl:flex-row xl:items-center justify-between gap-4 sm:gap-6 relative overflow-hidden">
         <div className="absolute -top-12 -right-12 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="flex items-center space-x-4 relative z-10">
-          <div className="w-12 h-12 rounded-2xl bg-white/15 border border-white/20 text-white flex items-center justify-center shadow-xs shrink-0">
-            <Database className="w-6 h-6 text-white" />
+        <div className="flex items-center space-x-3.5 sm:space-x-4 relative z-10">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/15 border border-white/20 text-white flex items-center justify-center shadow-xs shrink-0">
+            <Database className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-extrabold tracking-tight text-white">Knowledge Hub</h1>
-
-
+              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">Knowledge Hub</h1>
             </div>
-            <p className="text-sm text-indigo-100 font-medium mt-1">
+            <p className="text-xs sm:text-sm text-indigo-100 font-medium mt-0.5 sm:mt-1">
               Upload, organize, and manage the knowledge your team needs.
             </p>
           </div>
         </div>
 
         {/* 3 Integrated Navigation Tab Buttons */}
-        <div className="flex items-center space-x-2 bg-white/15 backdrop-blur-md p-1.5 rounded-xl border border-white/20 relative z-10 self-start xl:self-auto shrink-0">
+        <div className="flex items-center space-x-2 bg-white/15 backdrop-blur-md p-1.5 rounded-xl border border-white/20 relative z-10 w-full sm:w-auto overflow-x-auto no-scrollbar shrink-0">
           <button
             onClick={() => setActiveTab('records')}
-            className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center space-x-2 cursor-pointer ${activeTab === 'records'
+            className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center space-x-2 cursor-pointer shrink-0 ${activeTab === 'records'
               ? 'bg-white text-indigo-600 shadow-md font-extrabold'
               : 'text-white hover:bg-white/15'
               }`}
@@ -655,7 +653,7 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
 
           <button
             onClick={() => setActiveTab('add')}
-            className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center space-x-2 cursor-pointer ${activeTab === 'add'
+            className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center space-x-2 cursor-pointer shrink-0 ${activeTab === 'add'
               ? 'bg-white text-indigo-600 shadow-md font-extrabold'
               : 'text-white hover:bg-white/15'
               }`}
@@ -667,7 +665,7 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
           {!isChromaUnlocked ? (
             <button
               onClick={handleUnlockChroma}
-              className="px-4 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer text-white hover:bg-white/15"
+              className="px-3.5 sm:px-4 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer text-white hover:bg-white/15 shrink-0"
               title="Unlock ChromaDB Vectors"
             >
               <Info className="w-4 h-4" />
@@ -675,7 +673,7 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
           ) : (
             <button
               onClick={() => setActiveTab('chroma')}
-              className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center space-x-2 cursor-pointer ${activeTab === 'chroma'
+              className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center space-x-2 cursor-pointer shrink-0 ${activeTab === 'chroma'
                 ? 'bg-white text-indigo-600 shadow-md font-extrabold'
                 : 'text-white hover:bg-white/15'
                 }`}

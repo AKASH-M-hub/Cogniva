@@ -1,5 +1,6 @@
 .DS_Store
 Thumbs.db
+powershell.cmd
 
 # Python
 __pycache__/

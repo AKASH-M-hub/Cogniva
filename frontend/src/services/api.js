@@ -111,21 +111,33 @@ export const responseAgentAPI = {
 
 export const knowledgeHubAPI = {
   // Upload physical document (PDF, DOCX, TXT)
-  uploadDocument: async (file, userEmail = "employee@cogniva.ai", uploadedBy = null, department = null, orgId = null, userId = null) => {
+  uploadDocument: async (file, userEmail = "akashmohanraj333@gmail.com", uploadedBy = null, department = null, orgId = null, userId = null) => {
     try {
+      const emailToSend = (userEmail && userEmail.includes('@') && !userEmail.includes('example.com') && !userEmail.includes('cogniva.ai'))
+        ? userEmail
+        : 'akashmohanraj333@gmail.com';
+
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('user_email', userEmail);
+      formData.append('user_email', emailToSend);
       if (uploadedBy) formData.append('uploaded_by', uploadedBy);
       if (department) formData.append('department', department);
       if (orgId) formData.append('org_id', orgId);
       if (userId) formData.append('user_id', userId);
 
-      // Direct upload to FastAPI /upload/ with multi-tenant tracking
-      const response = await api.post('/upload/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      return response.data;
+      // Route through n8n automation proxy to trigger Knowledge Ingestion workflow & send email
+      try {
+        const n8nRes = await api.post('/upload/n8n-proxy', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return n8nRes.data;
+      } catch (proxyErr) {
+        console.warn('n8n proxy upload notice, falling back to direct upload:', proxyErr);
+        const response = await api.post('/upload/', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return response.data;
+      }
     } catch (error) {
       console.error('Document Upload API error:', error);
       throw error;

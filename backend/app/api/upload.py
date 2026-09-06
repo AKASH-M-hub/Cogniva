@@ -44,18 +44,32 @@ class KnowledgeTextRequest(BaseModel):
 
 
 @router.post("/n8n-proxy")
-async def n8n_proxy(file: UploadFile = File(...), user_email: str = Form("default@cogniva.ai")):
-    """Proxies the upload to n8n automation webhook to bypass browser CORS limitations."""
+async def n8n_proxy(
+    file: UploadFile = File(...),
+    user_email: str = Form("akashmohanraj333@gmail.com"),
+    uploaded_by: Optional[str] = Form(None),
+    department: Optional[str] = Form(None),
+    org_id: Optional[int] = Form(None),
+    user_id: Optional[int] = Form(None)
+):
+    """Proxies the upload to n8n automation webhook to trigger ingestion workflow and automated email."""
     import httpx
     
     file_bytes = await file.read()
     files = {'file': (file.filename, file_bytes, file.content_type)}
-    data = {'user_email': user_email}
+    data = {
+        'user_email': user_email,
+        'uploaded_by': uploaded_by or '',
+        'department': department or '',
+        'org_id': str(org_id or ''),
+        'user_id': str(user_id or '')
+    }
     
     try:
+        n8n_target = settings.N8N_URL
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                f"{settings.N8N_URL}/webhook/knowledge-upload",
+                f"{n8n_target}/webhook/knowledge-upload",
                 data=data,
                 files=files,
                 headers={"bypass-tunnel-reminder": "true"},

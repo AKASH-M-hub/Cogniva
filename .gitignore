@@ -1,6 +1,8 @@
 .DS_Store
 Thumbs.db
 powershell.cmd
+cloudflared.exe
+
 
 # Python
 __pycache__/

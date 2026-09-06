@@ -32,8 +32,40 @@ import {
 } from 'lucide-react';
 import { knowledgeHubAPI, adminAPI, API_BASE_URL } from '../../services/api';
 
+const formatDisplayTimestamp = (ts) => {
+  if (!ts) return 'Just now';
+  if (/am|pm/i.test(ts)) return ts;
+  
+  const parts = ts.split(' ');
+  if (parts.length >= 2) {
+    const [datePart, timePart] = parts;
+    const [hStr, mStr] = timePart.split(':');
+    let h = parseInt(hStr, 10);
+    const m = mStr || '00';
+    if (!isNaN(h)) {
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${datePart} ${String(h12).padStart(2, '0')}:${m} ${ampm}`;
+    }
+  }
+  return ts;
+};
+
 const getTimeSegment = (timestampStr) => {
   if (!timestampStr) return 'Afternoon / Noon (12:00 PM - 05:00 PM)';
+  const lower = timestampStr.toLowerCase();
+  if (lower.includes('pm') || lower.includes('am')) {
+    const match = timestampStr.match(/(\d{1,2}):(\d{2})\s*(am|pm)/i);
+    if (match) {
+      let hour = parseInt(match[1], 10);
+      const ampm = match[3].toLowerCase();
+      if (ampm === 'pm' && hour < 12) hour += 12;
+      if (ampm === 'am' && hour === 12) hour = 0;
+      if (hour < 12) return 'Morning (08:00 AM - 12:00 PM)';
+      if (hour < 17) return 'Afternoon / Noon (12:00 PM - 05:00 PM)';
+      return 'Evening & Night (05:00 PM - 12:00 AM)';
+    }
+  }
   const parts = timestampStr.split(' ');
   if (parts.length < 2) return 'Afternoon / Noon (12:00 PM - 05:00 PM)';
   const timeParts = parts[1].split(':');
@@ -483,8 +515,10 @@ export default function KnowledgeHubWorkspace({ activeWorkspace, onNavigateToSea
                   <td className="py-3.5 px-4 font-mono text-slate-500">
                     {item.size_formatted || (item.char_count ? `${item.char_count} chars` : '420 chars')}
                   </td>
-                  <td className="py-3.5 px-4 text-slate-500 font-mono text-[11px]">
-                    {item.timestamp || '2026-08-05 21:41'}
+                  <td className="py-3.5 px-4 text-slate-600 font-mono text-[11px]">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-50 border border-slate-200/80 font-semibold text-slate-700">
+                      {formatDisplayTimestamp(item.timestamp)}
+                    </span>
                   </td>
                   <td className="py-3.5 px-4 text-right">
                     <div className="flex justify-end items-center space-x-2">

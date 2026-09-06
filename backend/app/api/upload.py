@@ -13,6 +13,20 @@ from app.services.vector_service import store_embeddings
 from app.database.postgres import get_db
 from app.config.settings import settings
 
+IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+
+def get_ist_now() -> datetime.datetime:
+    """Returns current datetime in accurate Indian Standard Time (IST, UTC+5:30)."""
+    return datetime.datetime.now(datetime.timezone.utc).astimezone(IST)
+
+def format_accurate_timestamp(dt: Optional[datetime.datetime]) -> str:
+    """Converts UTC or naive database datetime into accurate IST timestamp."""
+    if not dt:
+        dt = datetime.datetime.now(datetime.timezone.utc)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.astimezone(IST).strftime("%Y-%m-%d %H:%M")
+
 router = APIRouter(
     prefix="/upload",
     tags=["Knowledge Hub"]
@@ -89,7 +103,7 @@ def upload_document(
                 if not uploaded_by:
                     uploaded_by = user_rec.full_name or user_rec.email
 
-        timestamp_prefix = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp_prefix = get_ist_now().strftime("%Y%m%d_%H%M%S")
         original_filename = file.filename
         file.filename = f"{timestamp_prefix}_{file.filename}"
 
@@ -155,7 +169,7 @@ def upload_document(
             print(f"PostgreSQL Document Metadata Save Notice: {db_err}")
 
         # 2. Store Vector Embeddings in ChromaDB Persistent Client with Multi-Tenant metadata
-        now_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        now_ts = get_ist_now().strftime("%Y-%m-%d %H:%M")
         stored_chunks = store_embeddings(
             filename=file.filename,
             chunks=chunks,
@@ -216,7 +230,7 @@ def upload_knowledge_text(
             chunks = [request.description]
 
         virtual_filename = f"knowledge_{request.title.lower().replace(' ', '_')[:30]}.txt"
-        now_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        now_ts = get_ist_now().strftime("%Y-%m-%d %H:%M")
         stored_chunks = store_embeddings(
             filename=virtual_filename,
             chunks=chunks,
@@ -321,7 +335,7 @@ def get_upload_history(
         ext = f".{doc.file_type.lower()}" if doc.file_type else ".pdf"
         ftype = f"{doc.file_type} Document" if doc.file_type else "PDF Document"
         size = doc.file_size or 1024
-        ts = doc.upload_date.strftime("%Y-%m-%d %H:%M") if doc.upload_date else datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        ts = format_accurate_timestamp(doc.upload_date)
         
         seen_filenames.add(doc.filename)
         history.append({
@@ -368,7 +382,7 @@ def get_upload_history(
                 "chunks": 1,
                 "size_bytes": len(mem.decision or ""),
                 "size_formatted": f"{len(mem.decision or '')} chars",
-                "timestamp": mem.created_at.strftime("%Y-%m-%d %H:%M") if hasattr(mem, 'created_at') and mem.created_at else datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "timestamp": format_accurate_timestamp(mem.created_at if hasattr(mem, 'created_at') else None),
                 "status": "Indexed in PostgreSQL & ChromaDB",
                 "source": "Memory Vault Entry",
                 "priority": mem.priority or "Medium",
@@ -640,7 +654,7 @@ def get_chroma_history():
                 fname = meta.get("filename", meta.get("source", "Unknown_Source"))
                 timestamp = meta.get("timestamp")
                 if not timestamp:
-                    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                    timestamp = get_ist_now().strftime("%Y-%m-%d %H:%M")
 
                 items.append({
                     "id": item_id,

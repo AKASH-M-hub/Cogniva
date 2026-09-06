@@ -1,7 +1,16 @@
 from typing import Optional
 from fastapi import APIRouter, Query, HTTPException, Body, Depends
-from sqlalchemy.orm import Session
+import datetime
 from app.database.postgres import get_db
+
+IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+
+def format_accurate_timestamp(dt: Optional[datetime.datetime]) -> str:
+    if not dt:
+        dt = datetime.datetime.now(datetime.timezone.utc)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.astimezone(IST).strftime("%Y-%m-%d %H:%M")
 from app.schemas.search_schema import SearchRequest, SearchResponse
 from app.services.search_agent import (
     execute_enterprise_search,
@@ -153,7 +162,7 @@ def get_search_history(
         records = q.order_by(SearchHistory.search_time.desc()).limit(limit).all()
         history = []
         for r in records:
-            ts = r.search_time.strftime("%Y-%m-%d %H:%M") if r.search_time else "2026-08-12 14:00"
+            ts = format_accurate_timestamp(r.search_time) if r.search_time else "Just now"
             history.append({
                 "id": r.id,
                 "user_id": r.user_id or "emp_101",

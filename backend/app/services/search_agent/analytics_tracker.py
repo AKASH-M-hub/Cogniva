@@ -57,11 +57,38 @@ def log_search_execution(
                     import urllib.request
                     import json
                     from app.config.settings import settings
+                    # Resolve the Organization Admin for this user/department
+                    admin_email = "akashm.student@saveetha.ac.in"
+                    try:
+                        from app.database.postgres import SessionLocal
+                        from app.models.user import User
+                        with SessionLocal() as db:
+                            user_rec = None
+                            if user_email:
+                                user_rec = db.query(User).filter(User.email.ilike(user_email.strip())).first()
+                            elif user_id and str(user_id).isdigit():
+                                user_rec = db.query(User).filter(User.id == int(user_id)).first()
+                            
+                            if user_rec and user_rec.org_id:
+                                org_admin = db.query(User).filter(
+                                    User.org_id == user_rec.org_id,
+                                    User.user_type == "org_admin"
+                                ).first()
+                                if org_admin and org_admin.email:
+                                    admin_email = org_admin.email
+                            elif not user_rec:
+                                fallback_admin = db.query(User).filter(User.user_type == "org_admin").first()
+                                if fallback_admin and fallback_admin.email:
+                                    admin_email = fallback_admin.email
+                    except Exception as db_e:
+                        print(f"[AnalyticsTracker] Org admin resolution notice: {db_e}")
+
                     req = urllib.request.Request(
                         f'{settings.N8N_URL}/webhook/knowledge-gap',
                         data=json.dumps({
                             'user_id': user_id or 'System',
                             'user_email': user_email or 'akashmohanraj333@gmail.com',
+                            'admin_email': admin_email,
                             'query': query,
                             'department': user_department or 'General Enterprise'
                         }).encode('utf-8'),

@@ -40,7 +40,13 @@ async def n8n_proxy(file: UploadFile = File(...), user_email: str = Form("defaul
     
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.post(f"{settings.N8N_URL}/webhook/knowledge-upload", data=data, files=files, timeout=60.0)
+            resp = await client.post(
+                f"{settings.N8N_URL}/webhook/knowledge-upload",
+                data=data,
+                files=files,
+                headers={"bypass-tunnel-reminder": "true"},
+                timeout=60.0
+            )
             
         if resp.status_code != 200:
             raise HTTPException(status_code=500, detail=f"n8n webhook returned error code {resp.status_code}: {resp.text}")

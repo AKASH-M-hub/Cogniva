@@ -65,7 +65,10 @@ def log_search_execution(
                             'query': query,
                             'department': user_department or 'General Enterprise'
                         }).encode('utf-8'),
-                        headers={'Content-Type': 'application/json'}
+                        headers={
+                            'Content-Type': 'application/json',
+                            'bypass-tunnel-reminder': 'true'
+                        }
                     )
                     urllib.request.urlopen(req, timeout=5)
                 except Exception as e:

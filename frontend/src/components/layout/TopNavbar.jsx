@@ -161,7 +161,11 @@ export default function TopNavbar({ activeWorkspace, setActiveWorkspace, onOpenM
         <div className="h-6 w-px bg-slate-200"></div>
 
         {/* User Profile */}
-        <div className="flex items-center space-x-3 cursor-pointer group select-none">
+        <div 
+          onClick={() => setActiveWorkspace && setActiveWorkspace('settings')}
+          className="flex items-center space-x-3 cursor-pointer group select-none hover:opacity-90 transition-opacity"
+          title="Account Settings & Identity Vault"
+        >
           <div className="w-10 h-10 rounded-md bg-indigo-600 text-white flex items-center justify-center font-extrabold text-sm shadow-md overflow-hidden shrink-0 group-hover:bg-indigo-700 transition-all">
             {profile.profilePicture ? (
               <img src={profile.profilePicture} alt="Profile" className="w-full h-full object-cover" />

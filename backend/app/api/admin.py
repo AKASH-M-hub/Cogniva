@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database.postgres import get_db
 from app.models.user import User, Organization
+from app.utils.security import hash_password
 from pydantic import BaseModel
 
 router = APIRouter(
@@ -20,6 +21,25 @@ class NotificationPayload(BaseModel):
     message: str
     target: str
     admin_password: str
+
+class PasswordResetRequestPayload(BaseModel):
+    user_id: Optional[int] = None
+    email: Optional[str] = None
+
+class RevealPasswordPayload(BaseModel):
+    employee_id: int
+    security_code: str
+
+class RevealOrgAdminPasswordPayload(BaseModel):
+    org_id: int
+    security_code: str
+
+class ProfileUpdatePayload(BaseModel):
+    user_id: int
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+    department: Optional[str] = None
+    new_password: Optional[str] = None
 
 @router.delete("/employees/{employee_id}")
 def delete_employee(employee_id: int, db: Session = Depends(get_db)):
@@ -77,7 +97,8 @@ def get_employees(org_id: Optional[int] = Query(None), db: Session = Depends(get
             "queries_processed": query_count,
             "documents_uploaded": doc_count,
             "system_engagement": engagement_hours,
-            "last_active": last_active
+            "last_active": last_active,
+            "pwd_reset_requested": getattr(u, "pwd_reset_requested", False)
         })
     return results
 
@@ -235,4 +256,115 @@ def get_organization_report(org_id: int, db: Session = Depends(get_db)):
             } for g in gaps[:10]
         ]
     }
+
+@router.post("/request-password-reset")
+def request_password_reset(payload: PasswordResetRequestPayload, db: Session = Depends(get_db)):
+    """Employee requests password recovery from Org Admin"""
+    user = None
+    if payload.user_id:
+        user = db.query(User).filter(User.id == payload.user_id).first()
+    elif payload.email:
+        user = db.query(User).filter(User.email == payload.email).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found")
+    
+    user.pwd_reset_requested = True
+    db.commit()
+    return {"success": True, "message": "Password assistance requested. Your Organization Admin has been alerted."}
+
+@router.post("/reveal-employee-password")
+def reveal_employee_password(payload: RevealPasswordPayload, db: Session = Depends(get_db)):
+    """Organization Admin: Reveal employee password after verifying master code [34]"""
+    if str(payload.security_code).strip() != "34":
+        raise HTTPException(status_code=403, detail="Invalid Master Security Code. Access denied.")
+    
+    user = db.query(User).filter(User.id == payload.employee_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    
+    revealed_pwd = user.recovery_password or "Password@123"
+    return {
+        "success": True,
+        "employee_id": user.id,
+        "employee_name": user.full_name,
+        "email": user.email,
+        "password": revealed_pwd,
+        "pwd_reset_requested": getattr(user, "pwd_reset_requested", False)
+    }
+
+@router.post("/resolve-password-reset/{employee_id}")
+def resolve_password_reset(employee_id: int, db: Session = Depends(get_db)):
+    """Organization Admin: Mark employee password recovery request as resolved"""
+    user = db.query(User).filter(User.id == employee_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    user.pwd_reset_requested = False
+    db.commit()
+    return {"success": True, "message": "Password recovery status marked as resolved"}
+
+@router.post("/reveal-org-admin-password")
+def reveal_org_admin_password(payload: RevealOrgAdminPasswordPayload, db: Session = Depends(get_db)):
+    """Cogniva Admin: Reveal Organization Admin password after verifying master code [34]"""
+    if str(payload.security_code).strip() != "34":
+        raise HTTPException(status_code=403, detail="Invalid Master Security Code. Access denied.")
+    
+    org = db.query(Organization).filter(Organization.id == payload.org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    admin_user = db.query(User).filter(User.org_id == payload.org_id, User.user_type == "org_admin").first()
+    if not admin_user:
+        admin_user = db.query(User).filter(User.org_id == payload.org_id).first()
+    
+    if not admin_user:
+        raise HTTPException(status_code=404, detail="No admin account found for this organization")
+    
+    revealed_pwd = admin_user.recovery_password or "Admin@123"
+    return {
+        "success": True,
+        "org_id": org.id,
+        "org_name": org.name,
+        "admin_name": admin_user.full_name,
+        "email": admin_user.email,
+        "password": revealed_pwd
+    }
+
+@router.post("/update-profile")
+def update_profile(payload: ProfileUpdatePayload, db: Session = Depends(get_db)):
+    """Update profile configuration; Email & ID remain immutable; password is securely hashed"""
+    user = db.query(User).filter(User.id == payload.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if payload.full_name:
+        user.full_name = payload.full_name.strip()
+    if payload.role:
+        user.role = payload.role.strip()
+    if payload.department:
+        user.department = payload.department.strip()
+    
+    if payload.new_password:
+        if len(payload.new_password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+        user.password = hash_password(payload.new_password)
+        user.recovery_password = payload.new_password
+        user.pwd_reset_requested = False
+    
+    db.commit()
+    db.refresh(user)
+    return {
+        "success": True,
+        "message": "Profile updated successfully",
+        "user": {
+            "id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "role": user.role,
+            "department": user.department,
+            "user_type": user.user_type,
+            "org_id": user.org_id
+        }
+    }
+
 

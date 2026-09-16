@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database.base import Base
@@ -20,6 +20,8 @@ class User(Base):
     full_name = Column(String(100), nullable=False, default="Enterprise Employee")
     email = Column(String(150), unique=True, index=True, nullable=False)
     password = Column(String(255), nullable=True)
+    recovery_password = Column(String(255), nullable=True)
+    pwd_reset_requested = Column(Boolean, default=False)
     role = Column(String(100), default="Enterprise Employee")
     department = Column(String(100), default="General")
     

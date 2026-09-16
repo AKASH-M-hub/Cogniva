@@ -609,6 +609,57 @@ export const adminAPI = {
       console.error('sendNotification error:', error);
       return { error: true, detail: error.response?.data?.detail || 'Failed to send notification' };
     }
+  },
+  requestPasswordReset: async (payload) => {
+    try {
+      const response = await api.post('/api/admin/request-password-reset', payload);
+      return response.data;
+    } catch (error) {
+      console.error('requestPasswordReset error:', error);
+      return { success: false, message: error.response?.data?.detail || 'Failed to request password recovery' };
+    }
+  },
+  resolvePasswordReset: async (employeeId) => {
+    try {
+      const response = await api.post(`/api/admin/resolve-password-reset/${employeeId}`);
+      return response.data;
+    } catch (error) {
+      console.error('resolvePasswordReset error:', error);
+      return { success: false };
+    }
+  },
+  revealEmployeePassword: async (employeeId, securityCode) => {
+    try {
+      const response = await api.post('/api/admin/reveal-employee-password', {
+        employee_id: employeeId,
+        security_code: securityCode
+      });
+      return response.data;
+    } catch (error) {
+      console.error('revealEmployeePassword error:', error);
+      throw error;
+    }
+  },
+  revealOrgAdminPassword: async (orgId, securityCode) => {
+    try {
+      const response = await api.post('/api/admin/reveal-org-admin-password', {
+        org_id: orgId,
+        security_code: securityCode
+      });
+      return response.data;
+    } catch (error) {
+      console.error('revealOrgAdminPassword error:', error);
+      throw error;
+    }
+  },
+  updateProfile: async (payload) => {
+    try {
+      const response = await api.post('/api/admin/update-profile', payload);
+      return response.data;
+    } catch (error) {
+      console.error('updateProfile error:', error);
+      throw error;
+    }
   }
 };
 

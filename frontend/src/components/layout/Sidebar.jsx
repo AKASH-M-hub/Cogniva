@@ -31,12 +31,14 @@ export default function Sidebar({
   if (isCognivaAdmin) {
     adminNavItems = [
       { id: 'network', label: 'Global Network', icon: Users },
-      { id: 'directory', label: 'Org Admin Directory', icon: Users }
+      { id: 'directory', label: 'Org Admin Directory', icon: Users },
+      { id: 'settings', label: 'Settings', icon: Settings }
     ];
   } else if (isOrgAdmin) {
     adminNavItems = [
       { id: 'provisioning', label: 'Provision Employees', icon: UserPlus },
-      { id: 'directory', label: 'Access & Directory', icon: Users }
+      { id: 'directory', label: 'Access & Directory', icon: Users },
+      { id: 'settings', label: 'Settings', icon: Settings }
     ];
   }
 

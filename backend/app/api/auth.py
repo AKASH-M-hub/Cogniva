@@ -48,6 +48,7 @@ def register_cogniva_admin(req: CognivaAdminRegisterRequest, db: Session = Depen
         full_name=req.admin_name,
         email=req.admin_email,
         password=hash_password(req.admin_password),
+        recovery_password=req.admin_password,
         department="Core Infrastructure",
         user_type="cogniva_admin",
         role="Master System Admin"

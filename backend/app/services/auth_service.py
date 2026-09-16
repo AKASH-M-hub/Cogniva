@@ -22,6 +22,7 @@ def register_user(db: Session, user: RegisterRequest):
         full_name=user.full_name,
         email=user.email,
         password=hash_password(user.password),
+        recovery_password=user.password,
         department=user.department,
         user_type="cogniva_admin" if cogniva_super_admin else "employee"
     )
@@ -50,6 +51,7 @@ def register_organization(db: Session, req: OrgRegisterRequest):
         full_name=req.admin_name,
         email=req.admin_email,
         password=hash_password(req.admin_password),
+        recovery_password=req.admin_password,
         department="Administration",
         user_type="org_admin",
         org_id=org.id,
@@ -73,6 +75,7 @@ def register_org_employee(db: Session, req: EmployeeRegisterRequest):
         full_name=req.full_name,
         email=req.email,
         password=hash_password(req.password),
+        recovery_password=req.password,
         department=req.department,
         user_type="employee",
         org_id=req.org_id,
@@ -101,13 +104,19 @@ def login_user(db: Session, login: LoginRequest):
     if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid email or password. Please try again.")
 
-    # Seamless background upgrade from legacy plain text to high-speed bcrypt
-    if is_legacy:
-        try:
+    # Seamless background upgrade from legacy plain text to high-speed bcrypt and recovery sync
+    try:
+        updated = False
+        if is_legacy:
             user.password = hash_password(login.password)
+            updated = True
+        if not getattr(user, "recovery_password", None):
+            user.recovery_password = login.password
+            updated = True
+        if updated:
             db.commit()
-        except Exception:
-            db.rollback()
+    except Exception:
+        db.rollback()
 
     token = create_access_token({
         "sub": str(user.id),

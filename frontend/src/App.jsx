@@ -147,13 +147,13 @@ function App() {
 
   // If org_admin is lost, coerce to provisioning
   const isOrgAdmin = sessionUser?.user_type === 'org_admin';
-  if (isOrgAdmin && !['provisioning', 'directory'].includes(effectiveWorkspace)) {
+  if (isOrgAdmin && !['provisioning', 'directory', 'settings'].includes(effectiveWorkspace)) {
     effectiveWorkspace = 'provisioning';
   }
 
   // If cogniva_admin is lost, coerce to network
   const isCognivaAdmin = sessionUser?.user_type === 'cogniva_admin';
-  if (isCognivaAdmin && !['network', 'directory'].includes(effectiveWorkspace)) {
+  if (isCognivaAdmin && !['network', 'directory', 'settings'].includes(effectiveWorkspace)) {
     effectiveWorkspace = 'network';
   }
 

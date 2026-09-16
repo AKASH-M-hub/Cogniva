@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, Key, Send, CheckCircle2, AlertTriangle, ShieldCheck, 
   UserPlus, BarChart2, User, Mail, Lock, PlusCircle, Activity, 
-  Clock, FileText, ArrowRight, ShieldAlert, Eye, EyeOff 
+  Clock, FileText, ArrowRight, ShieldAlert, Eye, EyeOff, KeyRound, Copy, Check, X
 } from 'lucide-react';
 import api, { adminAPI } from '../../services/api';
 
@@ -23,6 +23,14 @@ export default function OrgManagement({ activeModule }) {
   const [recentCredentials, setRecentCredentials] = useState([]);
   const [empNotice, setEmpNotice] = useState('');
 
+  // Password Reveal with Master Code [34]
+  const [passwordRevealTarget, setPasswordRevealTarget] = useState(null);
+  const [securityCodeInput, setSecurityCodeInput] = useState('');
+  const [revealedPassword, setRevealedPassword] = useState(null);
+  const [revealError, setRevealError] = useState('');
+  const [revealLoading, setRevealLoading] = useState(false);
+  const [copiedPass, setCopiedPass] = useState(false);
+
   useEffect(() => {
     fetchEmployees();
   }, []);
@@ -40,7 +48,49 @@ export default function OrgManagement({ activeModule }) {
       await adminAPI.deleteEmployee(empId);
     }
   };
-  
+
+  const handleInitiatePasswordReveal = (emp) => {
+    setPasswordRevealTarget(emp);
+    setSecurityCodeInput('');
+    setRevealedPassword(null);
+    setRevealError('');
+    setCopiedPass(false);
+  };
+
+  const handleVerifyAndReveal = async (e) => {
+    if (e) e.preventDefault();
+    if (!securityCodeInput.trim()) {
+      setRevealError('Master verification code is required.');
+      return;
+    }
+    if (securityCodeInput.trim() !== '34') {
+      setRevealError('Invalid master security code. Access denied.');
+      return;
+    }
+
+    setRevealLoading(true);
+    setRevealError('');
+    try {
+      if (passwordRevealTarget.org_id && isCognivaAdmin && passwordRevealTarget.role === 'Organization Admin') {
+        const res = await adminAPI.revealOrgAdminPassword(passwordRevealTarget.org_id, securityCodeInput.trim());
+        setRevealedPassword(res.password);
+      } else {
+        const res = await adminAPI.revealEmployeePassword(passwordRevealTarget.id, securityCodeInput.trim());
+        setRevealedPassword(res.password);
+      }
+    } catch (err) {
+      setRevealError(err.response?.data?.detail || 'Verification failed. Access denied.');
+    } finally {
+      setRevealLoading(false);
+    }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopiedPass(true);
+    setTimeout(() => setCopiedPass(false), 2500);
+  };
+
   const handleCreateEmployee = async (e) => {
     e.preventDefault();
     if (!empForm.password || empForm.password.length < 8) {
@@ -56,7 +106,7 @@ export default function OrgManagement({ activeModule }) {
       });
       if (res.data.success) {
         setEmpNotice(res.data.message);
-        
+
         // Add to secure delivery log for the admin to copy
         setRecentCredentials(prev => [{
           name: empForm.full_name,
@@ -72,13 +122,13 @@ export default function OrgManagement({ activeModule }) {
       }
       setTimeout(() => setEmpNotice(''), 4000);
     } catch {
-       setEmpNotice('Failed to create employee credentials');
+      setEmpNotice('Failed to create employee credentials');
     }
   };
 
   return (
     <div className="w-full p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 select-none text-left font-sans max-w-full overflow-x-hidden">
-      
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 pb-4 border-b border-slate-200/80">
         <div className="flex items-center space-x-3 sm:space-x-4">
@@ -90,9 +140,6 @@ export default function OrgManagement({ activeModule }) {
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                 {isCognivaAdmin ? 'Master System Admin Panel' : 'Organization Admin Panel'}
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                Workspace Control
-              </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
               Manage employee credentials, access approvals, and monitor system telemetry.
@@ -102,7 +149,7 @@ export default function OrgManagement({ activeModule }) {
       </div>
 
       <div className="animate-in fade-in duration-300">
-        
+
         {/* MODULE 1: PROVISIONING */}
         {activeModule === 'provisioning' && (
           <div className="max-w-2xl bg-white border border-slate-200 rounded-3xl p-4 sm:p-8 shadow-sm">
@@ -125,31 +172,31 @@ export default function OrgManagement({ activeModule }) {
 
             {recentCredentials.length > 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 shadow-inner">
-                 <h3 className="text-xs font-bold text-amber-900 uppercase tracking-wider mb-2">Secure Credential Delivery Log</h3>
-                 <p className="text-[10px] text-amber-700 mb-3">Copy these raw passwords now. They are irreversibly hashed and will vanish on refresh.</p>
-                 <div className="space-y-2">
-                   {recentCredentials.map((cred, idx) => (
-                     <div key={idx} className="flex justify-between items-center bg-white border border-amber-100 px-3 py-2 rounded-lg shadow-xs text-xs font-mono">
-                       <div className="flex space-x-4">
-                          <span className="font-bold text-slate-900">{cred.name}</span>
-                       </div>
-                       <div className="flex items-center space-x-2">
-                         <span className="text-[10px] font-sans text-slate-400 font-bold">PASSWORD:</span>
-                         <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold tracking-wider">
-                           {showCredPasswords[idx] ? cred.password : '••••••••••••'}
-                         </span>
-                         <button
-                           type="button"
-                           onClick={() => setShowCredPasswords(prev => ({ ...prev, [idx]: !prev[idx] }))}
-                           className="text-amber-700 hover:text-amber-900 cursor-pointer p-1"
-                           title={showCredPasswords[idx] ? "Hide password" : "Show password"}
-                         >
-                           {showCredPasswords[idx] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                         </button>
-                       </div>
-                     </div>
-                   ))}
-                 </div>
+                <h3 className="text-xs font-bold text-amber-900 uppercase tracking-wider mb-2">Secure Credential Delivery Log</h3>
+                <p className="text-[10px] text-amber-700 mb-3">Copy these raw passwords now. They are irreversibly hashed and will vanish on refresh.</p>
+                <div className="space-y-2">
+                  {recentCredentials.map((cred, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-white border border-amber-100 px-3 py-2 rounded-lg shadow-xs text-xs font-mono">
+                      <div className="flex space-x-4">
+                        <span className="font-bold text-slate-900">{cred.name}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[10px] font-sans text-slate-400 font-bold">PASSWORD:</span>
+                        <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold tracking-wider">
+                          {showCredPasswords[idx] ? cred.password : '••••••••••••'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowCredPasswords(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                          className="text-amber-700 hover:text-amber-900 cursor-pointer p-1"
+                          title={showCredPasswords[idx] ? "Hide password" : "Show password"}
+                        >
+                          {showCredPasswords[idx] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -163,7 +210,7 @@ export default function OrgManagement({ activeModule }) {
                     </div>
                     <input
                       type="text" required
-                      value={empForm.full_name} onChange={(e) => setEmpForm({...empForm, full_name: e.target.value})}
+                      value={empForm.full_name} onChange={(e) => setEmpForm({ ...empForm, full_name: e.target.value })}
                       className="block w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
                       placeholder="e.g. John Doe"
                     />
@@ -178,7 +225,7 @@ export default function OrgManagement({ activeModule }) {
                     </div>
                     <input
                       type="email" required
-                      value={empForm.email} onChange={(e) => setEmpForm({...empForm, email: e.target.value})}
+                      value={empForm.email} onChange={(e) => setEmpForm({ ...empForm, email: e.target.value })}
                       className="block w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
                       placeholder="john@organisation.com"
                     />
@@ -199,7 +246,7 @@ export default function OrgManagement({ activeModule }) {
                     required
                     minLength={8}
                     value={empForm.password}
-                    onChange={(e) => setEmpForm({...empForm, password: e.target.value})}
+                    onChange={(e) => setEmpForm({ ...empForm, password: e.target.value })}
                     className="block w-full pl-10 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
                     placeholder="••••••••"
                   />
@@ -219,7 +266,7 @@ export default function OrgManagement({ activeModule }) {
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Department</label>
                   <input
                     type="text" required
-                    value={empForm.department} onChange={(e) => setEmpForm({...empForm, department: e.target.value})}
+                    value={empForm.department} onChange={(e) => setEmpForm({ ...empForm, department: e.target.value })}
                     className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
                     placeholder="Engineering"
                   />
@@ -228,7 +275,7 @@ export default function OrgManagement({ activeModule }) {
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Role</label>
                   <input
                     type="text" required
-                    value={empForm.role} onChange={(e) => setEmpForm({...empForm, role: e.target.value})}
+                    value={empForm.role} onChange={(e) => setEmpForm({ ...empForm, role: e.target.value })}
                     className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
                     placeholder="Analyst"
                   />
@@ -273,8 +320,8 @@ export default function OrgManagement({ activeModule }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {(isCognivaAdmin 
-                    ? employees.filter(emp => emp.role === 'Organization Admin') 
+                  {(isCognivaAdmin
+                    ? employees.filter(emp => emp.role === 'Organization Admin')
                     : employees.filter(emp => emp.role !== 'Organization Admin' && emp.role !== 'Master System Admin')
                   ).map((emp) => (
                     <tr key={emp.id} className="hover:bg-slate-50/50 transition-colors">
@@ -286,41 +333,63 @@ export default function OrgManagement({ activeModule }) {
                       </td>
                       <td className="p-4 font-mono text-xs text-slate-600">{emp.email}</td>
                       <td className="p-4">
-                         <div className="flex flex-col space-y-0.5">
-                            <span className="font-bold text-slate-800 text-xs">{emp.role}</span>
-                            <span className="text-[10px] text-slate-500">{emp.department}</span>
-                         </div>
+                        <div className="flex flex-col space-y-0.5">
+                          <span className="font-bold text-slate-800 text-xs">{emp.role}</span>
+                          <span className="text-[10px] text-slate-500">{emp.department}</span>
+                        </div>
                       </td>
                       <td className="p-4">
-                        <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>Approved</span>
-                        </span>
+                        <div className="flex flex-col space-y-1">
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold w-fit">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>Approved</span>
+                          </span>
+                          {emp.pwd_reset_requested && (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-black w-fit animate-pulse">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <span>Forgot Password Alert</span>
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-4 text-right">
-                        <button 
-                          onClick={() => handleRevokeAccess(emp.id, emp.full_name)}
-                          className="px-3 py-1.5 bg-white hover:bg-rose-50 hover:text-rose-600 border border-slate-200 text-slate-600 font-bold rounded-lg text-xs transition-colors cursor-pointer inline-flex items-center space-x-1.5 shadow-xs"
-                        >
-                          <ShieldAlert className="w-3.5 h-3.5" />
-                          <span>Revoke Access</span>
-                        </button>
+                        <div className="flex items-center justify-end space-x-2">
+                          <button
+                            onClick={() => handleInitiatePasswordReveal(emp)}
+                            className={`px-3 py-1.5 font-bold rounded-lg text-xs transition-all cursor-pointer inline-flex items-center space-x-1.5 shadow-2xs ${
+                              emp.pwd_reset_requested
+                                ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-md animate-pulse ring-2 ring-amber-300'
+                                : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200'
+                            }`}
+                            title="Reveal password using master code 34"
+                          >
+                            <KeyRound className="w-3.5 h-3.5" />
+                            <span>Show Password</span>
+                          </button>
+                          <button
+                            onClick={() => handleRevokeAccess(emp.id, emp.full_name)}
+                            className="px-2.5 py-1.5 bg-white hover:bg-rose-50 hover:text-rose-600 border border-slate-200 text-slate-600 font-bold rounded-lg text-xs transition-colors cursor-pointer inline-flex items-center space-x-1.5 shadow-xs"
+                          >
+                            <ShieldAlert className="w-3.5 h-3.5" />
+                            <span>Revoke Access</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                   {employees.length === 0 && !loading && (
-                     <tr>
-                        <td colSpan={5} className="p-8 text-center text-slate-400 font-medium text-sm">
-                           No employees have been provisioned yet.
-                        </td>
-                     </tr>
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-slate-400 font-medium text-sm">
+                        No employees have been provisioned yet.
+                      </td>
+                    </tr>
                   )}
                   {loading && (
-                     <tr>
-                        <td colSpan={5} className="p-8 text-center text-slate-400 font-medium text-sm">
-                           Loading enterprise registry...
-                        </td>
-                     </tr>
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-slate-400 font-medium text-sm">
+                        Loading enterprise registry...
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -345,8 +414,8 @@ export default function OrgManagement({ activeModule }) {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {(isCognivaAdmin 
-                  ? employees.filter(emp => emp.role === 'Organization Admin') 
+                {(isCognivaAdmin
+                  ? employees.filter(emp => emp.role === 'Organization Admin')
                   : employees.filter(emp => emp.role !== 'Organization Admin' && emp.role !== 'Master System Admin' && emp.user_type !== 'cogniva_admin')
                 ).map((emp) => (
                   <div key={emp.id} className="bg-slate-50/50 hover:bg-white border border-slate-200 rounded-2xl p-6 transition-all shadow-2xs hover:shadow-lg hover:shadow-slate-200/50 cursor-default">
@@ -370,14 +439,14 @@ export default function OrgManagement({ activeModule }) {
                           {emp.queries_processed ?? 0}
                         </span>
                       </div>
-                      
+
                       <div className="flex justify-between items-center">
                         <div className="flex items-center space-x-2 text-slate-500">
                           <Clock className="w-4 h-4" />
                           <span className="text-xs font-bold">System Engagement</span>
                         </div>
                         <span className="text-xs font-bold text-slate-700">
-                           {emp.system_engagement ?? 0}h
+                          {emp.system_engagement ?? 0}h
                         </span>
                       </div>
 
@@ -394,19 +463,158 @@ export default function OrgManagement({ activeModule }) {
 
                   </div>
                 ))}
-                
+
                 {employees.length === 0 && (
-                   <div className="col-span-1 md:col-span-2 lg:col-span-3 py-12 text-center border-2 border-dashed border-slate-200 rounded-2xl">
-                      <Activity className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                      <p className="text-sm font-bold text-slate-500">No active telemetry found.</p>
-                      <p className="text-xs text-slate-400">Provision employees to begin tracking metrics.</p>
-                   </div>
+                  <div className="col-span-1 md:col-span-2 lg:col-span-3 py-12 text-center border-2 border-dashed border-slate-200 rounded-2xl">
+                    <Activity className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <p className="text-sm font-bold text-slate-500">No active telemetry found.</p>
+                    <p className="text-xs text-slate-400">Provision employees to begin tracking metrics.</p>
+                  </div>
                 )}
               </div>
             </div>
           </div>
         )}
-        
+
+      {/* Password Reveal with Master Code [34] Modal */}
+      {passwordRevealTarget && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-200 animate-scaleIn">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
+                    <KeyRound className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-900">
+                      Master Security Verification
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Decrypt credentials for {passwordRevealTarget.full_name}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPasswordRevealTarget(null)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {!revealedPassword ? (
+                <form onSubmit={handleVerifyAndReveal} className="space-y-4 pt-1">
+                  <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                    To reveal this account's password, enter the authorized master security code <span className="font-mono font-black text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">[ 34 ]</span> below:
+                  </p>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-extrabold uppercase text-slate-500 tracking-wider block">
+                      Master Security Code
+                    </label>
+                    <input
+                      type="password"
+                      autoFocus
+                      placeholder="Enter security code [34]"
+                      value={securityCodeInput}
+                      onChange={(e) => {
+                        setSecurityCodeInput(e.target.value);
+                        setRevealError('');
+                      }}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-center font-black text-base text-slate-900 tracking-widest focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+
+                  {revealError && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold rounded-xl flex items-center space-x-2 animate-fadeIn">
+                      <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>{revealError}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end space-x-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setPasswordRevealTarget(null)}
+                      className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={revealLoading}
+                      className="px-5 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      {revealLoading ? 'Verifying...' : 'Unlock Password'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-4 pt-1 animate-fadeIn">
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-2">
+                    <div className="flex items-center space-x-1.5 text-emerald-800 font-extrabold text-xs">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>Verification Succeeded • Decrypted</span>
+                    </div>
+                    <div className="space-y-1 text-xs">
+                      <div><span className="text-slate-500 font-medium">Account:</span> <strong className="text-slate-900">{passwordRevealTarget.email}</strong></div>
+                      <div><span className="text-slate-500 font-medium">Role:</span> <strong className="text-slate-900">{passwordRevealTarget.role}</strong></div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-extrabold uppercase text-slate-500 tracking-wider block">
+                      Active Account Password
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={revealedPassword}
+                        className="flex-1 p-3 bg-slate-100 border border-slate-300 rounded-xl font-mono font-black text-sm text-slate-900 select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(revealedPassword)}
+                        className="p-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl cursor-pointer transition-colors shadow-xs"
+                        title="Copy password to clipboard"
+                      >
+                        {copiedPass ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between">
+                    {passwordRevealTarget.pwd_reset_requested && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await adminAPI.resolvePasswordReset(passwordRevealTarget.id);
+                          setEmployees(prev => prev.map(e => e.id === passwordRevealTarget.id ? { ...e, pwd_reset_requested: false } : e));
+                          setPasswordRevealTarget(null);
+                        }}
+                        className="px-3.5 py-2 text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-xl cursor-pointer transition-colors flex items-center space-x-1.5"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Acknowledge & Clear Alert</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setPasswordRevealTarget(null)}
+                      className="ml-auto px-5 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl cursor-pointer transition-colors"
+                    >
+                      Done / Close
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       </div>
     </div>
   );

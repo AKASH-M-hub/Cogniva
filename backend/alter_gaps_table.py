@@ -5,6 +5,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.database.postgres import engine
+# pyrefly: ignore [missing-import]
 from sqlalchemy import text
 
 def alter_table():

@@ -555,6 +555,15 @@ export const analyticsAgentAPI = {
 };
 
 export const adminAPI = {
+  getOrgReport: async (orgId) => {
+    try {
+      const response = await api.get(`/api/admin/organizations/${orgId}/report`);
+      return response.data;
+    } catch (error) {
+      console.error('getOrgReport error:', error);
+      return null;
+    }
+  },
   getEmployees: async (orgId = null) => {
     try {
       const url = orgId ? `/api/admin/employees?org_id=${orgId}` : '/api/admin/employees';

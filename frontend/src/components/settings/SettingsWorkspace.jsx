@@ -239,58 +239,8 @@ export default function SettingsWorkspace() {
             </div>
           </div>
 
-          {/* Action Button & Tabs Group */}
+          {/* Action Button */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 relative z-10 w-full md:w-auto">
-            {/* Integrated Navigation Tab Pills - LIKE EMPLOYEE PAGE SECTIONS */}
-            <div className="flex items-center space-x-1.5 bg-white/15 backdrop-blur-md p-1.5 rounded-xl border border-white/20 overflow-x-auto w-full sm:w-auto no-scrollbar">
-              <button
-                onClick={() => setActiveTab('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center space-x-1.5 cursor-pointer shrink-0 ${
-                  activeTab === 'all'
-                    ? 'bg-white text-indigo-700 shadow-md'
-                    : 'text-white hover:bg-white/15'
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>All Sections</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('profile')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center space-x-1.5 cursor-pointer shrink-0 ${
-                  activeTab === 'profile'
-                    ? 'bg-white text-indigo-700 shadow-md'
-                    : 'text-white hover:bg-white/15'
-                }`}
-              >
-                <User className="w-3.5 h-3.5" />
-                <span>Profile</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('security')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center space-x-1.5 cursor-pointer shrink-0 ${
-                  activeTab === 'security'
-                    ? 'bg-white text-indigo-700 shadow-md'
-                    : 'text-white hover:bg-white/15'
-                }`}
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Security</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('organization')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center space-x-1.5 cursor-pointer shrink-0 ${
-                  activeTab === 'organization'
-                    ? 'bg-white text-indigo-700 shadow-md'
-                    : 'text-white hover:bg-white/15'
-                }`}
-              >
-                <Building className="w-3.5 h-3.5" />
-                <span>Organization</span>
-              </button>
-            </div>
 
             <button
               onClick={handleSave}
@@ -330,29 +280,23 @@ export default function SettingsWorkspace() {
         )}
 
         {/* ========================================================================= */}
-        {/* SETTINGS SECTIONS GRID */}
+        {/* BASIC SETTINGS SECTIONS */}
         {/* ========================================================================= */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
           {/* SECTION 1: PROFILE & PERSONAL DETAILS */}
-          {(activeTab === 'all' || activeTab === 'profile') && (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-xs space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center border border-indigo-100 shrink-0">
-                    <User className="w-5 h-5 text-indigo-600" />
-                  </div>
-                  <div>
-                    <h2 className="font-extrabold text-base text-slate-900 uppercase tracking-wider">
-                      Profile & Identity Details
-                    </h2>
-                    <p className="text-[11px] text-slate-500 font-medium">Enterprise account identity and organizational profile</p>
-                  </div>
-                </div>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600">
-                  Section 1
-                </span>
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-xs space-y-6">
+            <div className="flex items-center space-x-3 border-b border-slate-100 pb-4">
+              <div className="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center border border-indigo-100 shrink-0">
+                <User className="w-5 h-5 text-indigo-600" />
               </div>
+              <div>
+                <h2 className="font-extrabold text-base text-slate-900 uppercase tracking-wider">
+                  Profile Details
+                </h2>
+                <p className="text-[11px] text-slate-500 font-medium">Manage your identity and personal information</p>
+              </div>
+            </div>
 
               <div className="space-y-4 text-sm font-sans">
                 {/* Full Name */}
@@ -459,27 +403,20 @@ export default function SettingsWorkspace() {
 
               </div>
             </div>
-          )}
 
-          {/* SECTION 2: SECURITY & PASSWORD VAULT */}
-          {(activeTab === 'all' || activeTab === 'security') && (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-xs space-y-6 h-fit">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center border border-emerald-100 shrink-0">
-                    <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <h2 className="font-extrabold text-base text-slate-900 uppercase tracking-wider">
-                      Security & Credential Vault
-                    </h2>
-                    <p className="text-[11px] text-slate-500 font-medium">Bcrypt hashing, password encryption & account protection</p>
-                  </div>
-                </div>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600">
-                  Section 2
-                </span>
+          {/* SECTION 2: SECURITY & PASSWORD */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-xs space-y-6 h-fit">
+            <div className="flex items-center space-x-3 border-b border-slate-100 pb-4">
+              <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center border border-emerald-100 shrink-0">
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
               </div>
+              <div>
+                <h2 className="font-extrabold text-base text-slate-900 uppercase tracking-wider">
+                  Security & Password
+                </h2>
+                <p className="text-[11px] text-slate-500 font-medium">Manage your account security and credentials</p>
+              </div>
+            </div>
 
               <div className="space-y-5 text-sm font-sans">
                 
@@ -628,57 +565,6 @@ export default function SettingsWorkspace() {
 
               </div>
             </div>
-          )}
-
-          {/* SECTION 3: ORGANIZATION & MULTI-TENANT CONTEXT */}
-          {(activeTab === 'all' || activeTab === 'organization') && (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-xs space-y-6 lg:col-span-2">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-9 h-9 bg-purple-50 rounded-xl flex items-center justify-center border border-purple-100 shrink-0">
-                    <Building className="w-5 h-5 text-purple-600" />
-                  </div>
-                  <div>
-                    <h2 className="font-extrabold text-base text-slate-900 uppercase tracking-wider">
-                      Organization & Tenant Isolation Parameters
-                    </h2>
-                    <p className="text-[11px] text-slate-500 font-medium">Enterprise boundary and data sovereignty configurations</p>
-                  </div>
-                </div>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600">
-                  Section 3
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Organization Identifier</span>
-                  <div className="font-mono font-black text-sm text-slate-900">
-                    {currentUser?.org_id ? `Org #${currentUser.org_id}` : 'Platform Root'}
-                  </div>
-                  <span className="text-[11px] text-slate-500 block">Assigned multi-tenant workspace isolation</span>
-                </div>
-
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Access Role Tier</span>
-                  <div className="font-bold text-sm text-slate-900">
-                    {userType === 'cogniva_admin' ? 'Master System Administrator' : userType === 'org_admin' ? 'Organization Administrator' : 'Standard Enterprise Member'}
-                  </div>
-                  <span className="text-[11px] text-slate-500 block">RBAC level with credential protection</span>
-                </div>
-
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Master Recovery Code</span>
-                  <div className="font-mono font-black text-sm text-indigo-700 flex items-center space-x-1.5">
-                    <span className="px-2 py-0.5 bg-indigo-50 rounded border border-indigo-200">[ 34 ]</span>
-                    <span className="text-[10px] font-normal text-slate-400">• Security Key</span>
-                  </div>
-                  <span className="text-[11px] text-slate-500 block">Admin credential decryption PIN</span>
-                </div>
-              </div>
-
-            </div>
-          )}
 
         </div>
 

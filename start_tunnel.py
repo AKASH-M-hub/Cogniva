@@ -18,14 +18,14 @@ def update_neon_tunnel(url: str):
         """, (url,))
         conn.commit()
         conn.close()
-        print(f"✅ Neon Database updated with active tunnel URL: {url}")
-        print("🔗 Render Backend is now automatically routing to this tunnel!\n")
+        print(f"Neon Database updated with active tunnel URL: {url}")
+        print("Render Backend is now automatically routing to this tunnel!\n")
     except Exception as e:
-        print(f"⚠️ Failed to update Neon DB: {e}")
+        print(f"Failed to update Neon DB: {e}")
 
 def main():
     print("=====================================================")
-    print("🚀 Cogniva Autonomous Tunnel Manager (Cloudflare)")
+    print("Cogniva Autonomous Tunnel Manager (Cloudflare)")
     print("=====================================================")
     print("Starting Cloudflare Tunnel to http://localhost:5678 ...")
 
@@ -48,11 +48,11 @@ def main():
             if match:
                 tunnel_url = match.group(0)
                 print("\n" + "="*55)
-                print(f"🎉 TUNNEL ACTIVE: {tunnel_url}")
+                print(f"TUNNEL ACTIVE: {tunnel_url}")
                 print("="*55)
                 update_neon_tunnel(tunnel_url)
-                print("⚡ Cogniva n8n workflows are now connected to the Cloud!")
-                print("💡 Press Ctrl+C to stop the tunnel when done.\n")
+                print("Cogniva n8n workflows are now connected to the Cloud!")
+                print("Press Ctrl+C to stop the tunnel when done.\n")
 
     proc.wait()
 
@@ -60,4 +60,4 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n🛑 Tunnel stopped cleanly.")
+        print("\nTunnel stopped cleanly.")

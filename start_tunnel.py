@@ -45,7 +45,7 @@ def main():
         print(line, end="")
         if not tunnel_url:
             match = url_pattern.search(line)
-            if match:
+            if match and match.group(0) != "https://api.trycloudflare.com":
                 tunnel_url = match.group(0)
                 print("\n" + "="*55)
                 print(f"TUNNEL ACTIVE: {tunnel_url}")
